@@ -1,0 +1,183 @@
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
+import type { BlockType, CityVariant } from "@memory-city/core-model";
+
+type SceneViewportProps = {
+  variant: CityVariant;
+  renderMode: "analytic" | "wood";
+  selectedSemanticNodeId: string | null;
+  onSelectSemanticNode: (semanticNodeId: string) => void;
+};
+
+const familyColors: Record<BlockType["family"], string> = {
+  mass: "#ded4bf",
+  axis: "#b48346",
+  plateau: "#c8ad89",
+  tower: "#735133",
+  gate: "#8d6440",
+  marker: "#412817",
+  bridge: "#a67b53"
+};
+
+const woodTextureCache = new Map<string, THREE.CanvasTexture>();
+
+function getType(variant: CityVariant, typeId: string): BlockType {
+  return variant.blockLibrary.blockTypes.find((entry) => entry.id === typeId)!;
+}
+
+function createWoodTexture(key: string): THREE.CanvasTexture {
+  if (woodTextureCache.has(key)) {
+    return woodTextureCache.get(key)!;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext("2d")!;
+
+  context.fillStyle = "#bea075";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < 36; i += 1) {
+    const x = (i / 36) * canvas.width;
+    const wobble = Math.sin(i * 1.3) * 9;
+    context.strokeStyle = i % 3 === 0 ? "rgba(94, 60, 27, 0.22)" : "rgba(235, 217, 186, 0.16)";
+    context.lineWidth = 3 + (i % 4);
+    context.beginPath();
+    context.moveTo(x + wobble, 0);
+    context.bezierCurveTo(x - 6, 80, x + 10, 170, x + wobble * 0.5, canvas.height);
+    context.stroke();
+  }
+
+  for (let i = 0; i < 18; i += 1) {
+    context.fillStyle = i % 2 === 0 ? "rgba(90, 53, 25, 0.06)" : "rgba(255, 250, 239, 0.08)";
+    context.beginPath();
+    context.ellipse(20 + i * 13, 80 + ((i * 17) % 120), 18, 6, 0.3, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(1.2, 1.2);
+  woodTextureCache.set(key, texture);
+  return texture;
+}
+
+function BlockMesh({
+  variant,
+  block,
+  renderMode,
+  selectedSemanticNodeId,
+  onSelectSemanticNode
+}: {
+  variant: CityVariant;
+  block: CityVariant["scene"]["blocks"][number];
+  renderMode: "analytic" | "wood";
+  selectedSemanticNodeId: string | null;
+  onSelectSemanticNode: (semanticNodeId: string) => void;
+}) {
+  const type = getType(variant, block.typeId);
+  const width = block.rotation === 90 ? type.depth : type.width;
+  const depth = block.rotation === 90 ? type.width : type.depth;
+  const position: [number, number, number] = [
+    block.x + width / 2 - variant.footprint.width / 2,
+    type.height / 2,
+    block.y + depth / 2 - variant.footprint.depth / 2
+  ];
+
+  const woodTexture = renderMode === "wood" ? createWoodTexture(type.family) : null;
+  const color = renderMode === "wood" ? "#d2b185" : familyColors[type.family];
+  const isSelected = block.semanticNodeId === selectedSemanticNodeId;
+  const semanticNodeId = block.semanticNodeId;
+
+  return (
+    <mesh
+      position={position}
+      castShadow
+      receiveShadow
+      onClick={semanticNodeId ? () => onSelectSemanticNode(semanticNodeId) : undefined}
+    >
+      <boxGeometry args={[width, type.height, depth]} />
+      <meshStandardMaterial
+        color={isSelected ? "#e3b477" : color}
+        map={woodTexture}
+        roughness={0.83}
+        metalness={0.02}
+        emissive={isSelected ? "#5a2416" : "#000000"}
+        emissiveIntensity={isSelected ? 0.22 : 0}
+      />
+    </mesh>
+  );
+}
+
+export function SceneViewport({
+  variant,
+  renderMode,
+  selectedSemanticNodeId,
+  onSelectSemanticNode
+}: SceneViewportProps) {
+  return (
+    <div className="viewport scene-viewport">
+      <Canvas camera={{ position: [8, 9, 12], fov: 42 }} shadows>
+        <color attach="background" args={["#f4eee3"]} />
+        <ambientLight intensity={0.9} />
+        <directionalLight
+          castShadow
+          intensity={1.1}
+          position={[9, 14, 7]}
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+        />
+
+        <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, 0]} receiveShadow>
+          <planeGeometry args={[variant.footprint.width + 3, variant.footprint.depth + 3]} />
+          <meshStandardMaterial color="#e7dcc9" roughness={1} />
+        </mesh>
+
+        {variant.scene.blocks.map((block) => (
+          <BlockMesh
+            key={block.id}
+            variant={variant}
+            block={block}
+            renderMode={renderMode}
+            selectedSemanticNodeId={selectedSemanticNodeId}
+            onSelectSemanticNode={onSelectSemanticNode}
+          />
+        ))}
+
+        {variant.scene.route.map((step) => {
+          const semanticNodeId = step.semanticNodeId;
+
+          return (
+            <mesh
+              key={step.id}
+              position={[
+                step.x + 0.5 - variant.footprint.width / 2,
+                0.08,
+                step.y + 0.5 - variant.footprint.depth / 2
+              ]}
+              rotation-x={-Math.PI / 2}
+              onClick={semanticNodeId ? () => onSelectSemanticNode(semanticNodeId) : undefined}
+            >
+              <circleGeometry args={[step.role === "landmark" ? 0.19 : 0.11, 24]} />
+              <meshBasicMaterial
+                color={
+                  semanticNodeId && semanticNodeId === selectedSemanticNodeId
+                    ? "#c55122"
+                    : step.role === "landmark"
+                      ? "#8a2f1b"
+                      : "#3d291d"
+                }
+              />
+            </mesh>
+          );
+        })}
+
+        <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2.05} />
+      </Canvas>
+    </div>
+  );
+}

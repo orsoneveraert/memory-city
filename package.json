@@ -1,0 +1,10 @@
+{
+  "name": "memory-city-workspace",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "dev": "pnpm --filter @memory-city/web dev",
+    "build": "pnpm --filter @memory-city/web build",
+    "check": "pnpm --filter @memory-city/web build"
+  }
+}

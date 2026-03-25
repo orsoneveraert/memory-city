@@ -1,0 +1,9 @@
+{
+  "name": "@memory-city/core-evaluation",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@memory-city/core-model": "workspace:*"
+  }
+}
