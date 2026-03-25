@@ -1,4 +1,11 @@
 import type { CityVariant, EvaluationReport } from "@memory-city/core-model";
+import type {
+  BlockPreviewRow,
+  FabricationSummary,
+  ZoneBlockStrategy,
+  ZoneImportState,
+  ZoneTypeProfile
+} from "../zoneBuilder";
 
 type InspectorPanelProps = {
   variant: CityVariant;
@@ -6,14 +13,15 @@ type InspectorPanelProps = {
   workspaceMode: "review" | "semantics" | "compose" | "evaluate" | "fabrication";
   selectedSemanticNodeId: string | null;
   diagnostics: string[];
-  siteImportState: {
-    sourceUrl: string;
-    spanMeters: number;
-    status: "idle" | "ready" | "error";
-    message: string;
-  };
+  siteImportState: ZoneImportState;
+  kitPreview: BlockPreviewRow[];
+  fabricationSummary: FabricationSummary;
   onSiteImportSourceChange: (value: string) => void;
   onSiteImportSpanChange: (value: number) => void;
+  onSiteImportModuleChange: (value: number) => void;
+  onSiteImportBlockStrategyChange: (value: ZoneBlockStrategy) => void;
+  onSiteImportUniformShapeChange: (dimension: "uniformWidthCm" | "uniformDepthCm" | "uniformHeightCm", value: number) => void;
+  onSiteImportTypeProfileChange: (value: ZoneTypeProfile) => void;
   onGenerateSiteVariant: () => void;
 };
 
@@ -24,8 +32,14 @@ export function InspectorPanel({
   selectedSemanticNodeId,
   diagnostics,
   siteImportState,
+  kitPreview,
+  fabricationSummary,
   onSiteImportSourceChange,
   onSiteImportSpanChange,
+  onSiteImportModuleChange,
+  onSiteImportBlockStrategyChange,
+  onSiteImportUniformShapeChange,
+  onSiteImportTypeProfileChange,
   onGenerateSiteVariant
 }: InspectorPanelProps) {
   const selectedNode = variant.semanticGraph.nodes.find((node) => node.id === selectedSemanticNodeId) ?? null;
@@ -76,11 +90,15 @@ export function InspectorPanel({
           {selectedNode ? (
             <div className="semantic-card">
               <div className="semantic-card-row">
-                <strong>{selectedNode.order}. {selectedNode.label}</strong>
+                <strong>
+                  {selectedNode.order}. {selectedNode.label}
+                </strong>
                 <span>{selectedNode.importance}/5</span>
               </div>
               <p>{selectedNode.note}</p>
-              <small>{selectedNode.kind} · {selectedNode.category}</small>
+              <small>
+                {selectedNode.kind} · {selectedNode.category}
+              </small>
             </div>
           ) : null}
 
@@ -94,29 +112,9 @@ export function InspectorPanel({
 
       {workspaceMode === "compose" ? (
         <section className="inspector-section">
-          <p className="eyebrow">Compose mode</p>
-          <div className="table-block">
-            <div className="table-row">
-              <span>Generator</span>
-              <strong>{variant.ruleSet.name}</strong>
-            </div>
-            <div className="table-row">
-              <span>Family</span>
-              <strong>{variant.ruleSet.generatorFamily}</strong>
-            </div>
-            <div className="table-row">
-              <span>Block module</span>
-              <strong>{variant.blockLibrary.moduleMm} mm</strong>
-            </div>
-          </div>
-
-          <div className="editorial-note">
-            <p>{variant.ruleSet.notes[0]}</p>
-            <p>{variant.ruleSet.notes[1]}</p>
-          </div>
+          <p className="eyebrow">Google map to blocks</p>
 
           <div className="form-block">
-            <p className="eyebrow">Geographic adapter</p>
             <label className="field-label" htmlFor="site-url">
               Google Maps URL or raw lat,lng
             </label>
@@ -128,32 +126,187 @@ export function InspectorPanel({
               onChange={(event) => onSiteImportSourceChange(event.target.value)}
             />
 
-            <label className="field-label" htmlFor="site-span">
-              Study span in meters
-            </label>
-            <input
-              id="site-span"
-              className="text-input text-input-small"
-              type="number"
-              min={160}
-              max={2000}
-              step={20}
-              value={siteImportState.spanMeters}
-              onChange={(event) => onSiteImportSpanChange(Number(event.target.value))}
-            />
+            <div className="field-grid field-grid-tight">
+              <div className="field-stack">
+                <label className="field-label" htmlFor="site-span">
+                  Study span (m)
+                </label>
+                <input
+                  id="site-span"
+                  className="text-input"
+                  type="number"
+                  min={160}
+                  max={2000}
+                  step={20}
+                  value={siteImportState.spanMeters}
+                  onChange={(event) => onSiteImportSpanChange(Number(event.target.value))}
+                />
+              </div>
 
-            <button className="primary-button" onClick={onGenerateSiteVariant} type="button">
-              Build zone study
-            </button>
-
-            <div className={`status-strip is-${siteImportState.status}`}>
-              <strong>{siteImportState.status}</strong>
-              <span>{siteImportState.message}</span>
+              <div className="field-stack">
+                <label className="field-label" htmlFor="site-module">
+                  Base module (cm)
+                </label>
+                <input
+                  id="site-module"
+                  className="text-input"
+                  type="number"
+                  min={0.5}
+                  max={8}
+                  step={0.5}
+                  value={siteImportState.moduleCm}
+                  onChange={(event) => onSiteImportModuleChange(Number(event.target.value))}
+                />
+              </div>
             </div>
+          </div>
 
-            <div className="editorial-note">
-              <p>This first adapter parses the Google Maps zone and builds a geospatially seeded woodblock study.</p>
-              <p>Direct Google photorealistic 3D scan sampling is a next adapter, because it requires the Map Tiles API and streamed 3D tiles.</p>
+          <div className="table-block">
+            <div className="table-row">
+              <span>Block system</span>
+              <strong>{siteImportState.blockStrategy === "uniform" ? "Single block size" : "Generative type set"}</strong>
+            </div>
+          </div>
+
+          <div className="segmented-toggle" role="tablist" aria-label="Block strategy">
+            <button
+              className={siteImportState.blockStrategy === "uniform" ? "is-active" : ""}
+              onClick={() => onSiteImportBlockStrategyChange("uniform")}
+              type="button"
+            >
+              Same block size
+            </button>
+            <button
+              className={siteImportState.blockStrategy === "generative" ? "is-active" : ""}
+              onClick={() => onSiteImportBlockStrategyChange("generative")}
+              type="button"
+            >
+              Generative shapes
+            </button>
+          </div>
+
+          {siteImportState.blockStrategy === "uniform" ? (
+            <div className="form-block">
+              <p className="eyebrow">Block shape (cm)</p>
+              <div className="field-grid field-grid-third">
+                <div className="field-stack">
+                  <label className="field-label" htmlFor="uniform-width">
+                    Width
+                  </label>
+                  <input
+                    id="uniform-width"
+                    className="text-input"
+                    type="number"
+                    min={siteImportState.moduleCm}
+                    step={siteImportState.moduleCm}
+                    value={siteImportState.uniformWidthCm}
+                    onChange={(event) => onSiteImportUniformShapeChange("uniformWidthCm", Number(event.target.value))}
+                  />
+                </div>
+                <div className="field-stack">
+                  <label className="field-label" htmlFor="uniform-depth">
+                    Depth
+                  </label>
+                  <input
+                    id="uniform-depth"
+                    className="text-input"
+                    type="number"
+                    min={siteImportState.moduleCm}
+                    step={siteImportState.moduleCm}
+                    value={siteImportState.uniformDepthCm}
+                    onChange={(event) => onSiteImportUniformShapeChange("uniformDepthCm", Number(event.target.value))}
+                  />
+                </div>
+                <div className="field-stack">
+                  <label className="field-label" htmlFor="uniform-height">
+                    Height
+                  </label>
+                  <input
+                    id="uniform-height"
+                    className="text-input"
+                    type="number"
+                    min={siteImportState.moduleCm}
+                    step={siteImportState.moduleCm}
+                    value={siteImportState.uniformHeightCm}
+                    onChange={(event) => onSiteImportUniformShapeChange("uniformHeightCm", Number(event.target.value))}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="form-block">
+              <p className="eyebrow">Type profile</p>
+              <div className="segmented-toggle segmented-toggle-tight" role="tablist" aria-label="Type profile">
+                <button
+                  className={siteImportState.typeProfile === "compact" ? "is-active" : ""}
+                  onClick={() => onSiteImportTypeProfileChange("compact")}
+                  type="button"
+                >
+                  Compact
+                </button>
+                <button
+                  className={siteImportState.typeProfile === "balanced" ? "is-active" : ""}
+                  onClick={() => onSiteImportTypeProfileChange("balanced")}
+                  type="button"
+                >
+                  Balanced
+                </button>
+                <button
+                  className={siteImportState.typeProfile === "vertical" ? "is-active" : ""}
+                  onClick={() => onSiteImportTypeProfileChange("vertical")}
+                  type="button"
+                >
+                  Vertical
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button className="primary-button" onClick={onGenerateSiteVariant} type="button">
+            Build zone study
+          </button>
+
+          <div className={`status-strip is-${siteImportState.status}`}>
+            <strong>{siteImportState.status}</strong>
+            <span>{siteImportState.message}</span>
+          </div>
+
+          <div className="analytic-block">
+            <div className="analytic-block-header">
+              <p className="eyebrow">Block kit preview</p>
+              <strong>{kitPreview.length} types</strong>
+            </div>
+            <div className="analytic-table">
+              <div className="analytic-row analytic-row-header">
+                <span>Type</span>
+                <span>Family</span>
+                <span>Size</span>
+              </div>
+              {kitPreview.map((row) => (
+                <div className="analytic-row" key={row.id}>
+                  <span>{row.label}</span>
+                  <span>{row.family}</span>
+                  <span>
+                    {row.widthCm} x {row.depthCm} x {row.heightCm} cm
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="analytic-block">
+            <div className="analytic-block-header">
+              <p className="eyebrow">Current maquette recap</p>
+              <strong>{fabricationSummary.totalBlocks} pieces</strong>
+            </div>
+            <div className="metric-list">
+              <MetricRow
+                label="Maquette size"
+                value={`${fabricationSummary.widthCm} x ${fabricationSummary.depthCm} x ${fabricationSummary.heightCm} cm`}
+              />
+              <MetricRow label="Distinct block types" value={fabricationSummary.distinctTypes.toString()} />
+              <MetricRow label="Wood volume" value={`${fabricationSummary.totalVolumeCm3} cm3`} />
+              <MetricRow label="Construction plan inset" value="Visible beside the main 3D view" />
             </div>
           </div>
         </section>
@@ -192,9 +345,21 @@ export function InspectorPanel({
             <MetricRow label="Material" value={variant.fabricationProfile.material} />
             <MetricRow label="Assembly" value={variant.fabricationProfile.joinStrategy} />
           </div>
-          <div className="finding-list">
-            <p>Wood mode is part of the design logic: it keeps the digital preview aligned with the intended object language.</p>
-            <p>Next fabrication pass should add cut lists, piece schedule, and a tray layout.</p>
+          <div className="analytic-table">
+            <div className="analytic-row analytic-row-header">
+              <span>Type</span>
+              <span>Count</span>
+              <span>Size</span>
+            </div>
+            {fabricationSummary.typeRows.map((row) => (
+              <div className="analytic-row" key={row.id}>
+                <span>{row.label}</span>
+                <span>{row.count}</span>
+                <span>
+                  {row.widthCm} x {row.depthCm} x {row.heightCm} cm
+                </span>
+              </div>
+            ))}
           </div>
         </section>
       ) : null}

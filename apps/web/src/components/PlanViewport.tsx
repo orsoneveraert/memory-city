@@ -43,7 +43,7 @@ export function PlanViewport({ variant, selectedSemanticNodeId, onSelectSemantic
 
   return (
     <div className="viewport plan-viewport">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Plan view of mnemonic city">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Plan view of wood block model">
         <defs>
           <pattern id="grid" width={cellSize} height={cellSize} patternUnits="userSpaceOnUse">
             <path d={`M ${cellSize} 0 L 0 0 0 ${cellSize}`} fill="none" stroke="#d8ccb8" strokeWidth="1" />

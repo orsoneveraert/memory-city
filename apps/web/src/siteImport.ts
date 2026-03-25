@@ -288,6 +288,7 @@ export function buildSiteVariantFromGoogleZone(options: {
   spanMeters: number;
   blockLibrary: BlockLibrary;
   fabricationProfile: FabricationProfile;
+  blockStrategy?: "uniform" | "generative";
 }): SiteImportResult {
   const zone = parseGoogleMapsZone(options.sourceUrl, options.spanMeters);
   const footprint = { width: 18, depth: 12 };
@@ -300,6 +301,8 @@ export function buildSiteVariantFromGoogleZone(options: {
   const occupiedBlockCells = new Set<string>();
   const occupiedVoidCells = new Set<string>();
   const candidates: Array<PlacedBlock & { score: number }> = [];
+  const availableTypeIds = new Set(options.blockLibrary.blockTypes.map((type) => type.id));
+  const fallbackTypeId = options.blockLibrary.blockTypes[0]?.id ?? "cube";
 
   for (let y = 0; y < footprint.depth; y += 1) {
     for (let x = 0; x < footprint.width; x += 1) {
@@ -354,15 +357,23 @@ export function buildSiteVariantFromGoogleZone(options: {
     }
 
     const preferredTypes =
-      candidate.score > 0.98
-        ? ["marker", "tower", "terrace"]
-        : candidate.score > 0.9
-          ? ["tower", "terrace", "gate"]
-          : candidate.score > 0.82
-            ? ["terrace", "slab", "bar"]
-            : candidate.score > 0.72
-              ? [candidate.rotation === 0 ? "bar" : "slab", "cube"]
-              : ["cube"];
+      options.blockStrategy === "uniform"
+        ? [fallbackTypeId]
+        : (
+            candidate.score > 0.98
+              ? ["marker", "tower", "terrace"]
+              : candidate.score > 0.9
+                ? ["tower", "terrace", "gate"]
+                : candidate.score > 0.82
+                  ? ["terrace", "slab", "bar"]
+                  : candidate.score > 0.72
+                    ? [candidate.rotation === 0 ? "bar" : "slab", "cube"]
+                    : ["cube"]
+          ).filter((typeId) => availableTypeIds.has(typeId));
+
+    if (preferredTypes.length === 0) {
+      preferredTypes.push(fallbackTypeId);
+    }
 
     let placed = false;
 
@@ -370,7 +381,13 @@ export function buildSiteVariantFromGoogleZone(options: {
       const attempt: PlacedBlock = {
         ...candidate,
         typeId,
-        rotation: typeId === "bar" ? candidate.rotation : 0
+        rotation: (() => {
+          const type = options.blockLibrary.blockTypes.find((entry) => entry.id === typeId);
+          if (!type) {
+            return 0;
+          }
+          return type.width !== type.depth ? candidate.rotation : 0;
+        })()
       };
 
       if (!canPlaceBlock(attempt, occupiedBlockCells, options.blockLibrary, footprint.width, footprint.depth)) {
@@ -462,12 +479,14 @@ export function buildSiteVariantFromGoogleZone(options: {
 
   const ruleSet: RuleSet = {
     id: `zone-adapter-${seed}`,
-    name: "Zone adapter — Google URL seed",
+    name: options.blockStrategy === "uniform" ? "Zone adapter - single block kit" : "Zone adapter - typed block kit",
     generatorFamily: "geo-zone-seeded",
     notes: [
       "Coordinates and zoom are used as the site seed.",
       "Primary void axes are treated as street-like clearances and pauses.",
-      "Direct Google photorealistic 3D mesh sampling is not wired in this prototype yet."
+      options.blockStrategy === "uniform"
+        ? "The generated study is constrained to one repeated block shape."
+        : "The generated study uses a rule-based family of block types."
     ]
   };
 
@@ -507,6 +526,6 @@ export function buildSiteVariantFromGoogleZone(options: {
     variant,
     report,
     diagnostics,
-    summary: `${zone.centerLat.toFixed(5)}, ${zone.centerLng.toFixed(5)} · ${zone.spanMeters} m span · ${placedBlocks.length} blocks`
+    summary: `${zone.centerLat.toFixed(5)}, ${zone.centerLng.toFixed(5)} · ${zone.spanMeters} m span · ${placedBlocks.length} pieces`
   };
 }

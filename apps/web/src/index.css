@@ -63,6 +63,7 @@ button {
 .sidebar > *,
 .inspector > *,
 .main-stage > *,
+.inspector-section > *,
 .stage-title-block,
 .stage-controls,
 .stage-metrics,
@@ -71,13 +72,22 @@ button {
 .viewer-secondary-shell,
 .secondary-label,
 .bottom-strip,
+.bottom-grid,
+.bottom-table-shell,
 .variant-card,
 .semantic-list-button,
 .semantic-card,
 .finding-list p,
 .editorial-note,
 .form-block,
-.status-strip {
+.status-strip,
+.field-grid,
+.field-stack,
+.analytic-block,
+.analytic-block-header,
+.analytic-table,
+.analytic-row,
+.segmented-toggle {
   min-width: 0;
 }
 
@@ -104,6 +114,10 @@ button {
   grid-template-columns: 220px minmax(0, 1fr) 300px;
   gap: 12px;
   min-height: 0;
+}
+
+.workspace-grid.is-compose-mode {
+  grid-template-columns: 180px minmax(0, 1.45fr) 360px;
 }
 
 .sidebar,
@@ -227,6 +241,10 @@ button {
   min-height: 78vh;
 }
 
+.main-stage.is-compose-mode {
+  min-height: 84vh;
+}
+
 .stage-header {
   justify-content: space-between;
   gap: 12px;
@@ -259,6 +277,10 @@ button {
   min-height: 0;
 }
 
+.viewer-layout.is-compose-mode {
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+
 .viewer-primary-shell,
 .viewer-secondary-shell {
   border: 1px solid var(--line);
@@ -268,6 +290,10 @@ button {
 
 .viewer-primary-shell {
   min-height: 66vh;
+}
+
+.main-stage.is-compose-mode .viewer-primary-shell {
+  min-height: 74vh;
 }
 
 .viewer-secondary-shell {
@@ -439,6 +465,25 @@ button {
   gap: 8px;
 }
 
+.field-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-grid.field-grid-third {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field-grid.field-grid-tight {
+  gap: 6px;
+}
+
+.field-stack {
+  display: grid;
+  gap: 6px;
+}
+
 .editorial-note {
   padding: 8px 0;
   border-top: 1px solid var(--line);
@@ -457,6 +502,37 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--muted);
+}
+
+.segmented-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.segmented-toggle.segmented-toggle-tight {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.segmented-toggle button {
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.62rem;
+}
+
+.segmented-toggle button:first-child {
+  border-left: 0;
+}
+
+.segmented-toggle button.is-active {
+  background: var(--accent-soft);
+  color: var(--ink);
 }
 
 .text-input {
@@ -523,6 +599,66 @@ button {
   background: #eef0e6;
 }
 
+.analytic-block {
+  display: grid;
+  gap: 8px;
+}
+
+.analytic-block-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.analytic-block-header strong {
+  font-family: "SFMono-Regular", Menlo, Monaco, monospace;
+  font-size: 0.72rem;
+}
+
+.analytic-table {
+  border-top: 1px solid var(--line);
+}
+
+.analytic-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) 72px minmax(0, 1.2fr);
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.71rem;
+}
+
+.analytic-row span {
+  overflow-wrap: anywhere;
+}
+
+.analytic-row.analytic-row-header {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.6rem;
+}
+
+.bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.bottom-table-shell {
+  display: grid;
+  gap: 8px;
+}
+
+.bottom-table-shell .analytic-row {
+  grid-template-columns: minmax(0, 1fr) 60px minmax(0, 1.1fr) 82px;
+}
+
+.bottom-table-shell:last-child .analytic-row {
+  grid-template-columns: 46px minmax(0, 0.8fr) minmax(0, 1.5fr);
+}
+
 .bottom-bar {
   padding: 10px 12px;
   display: grid;
@@ -552,6 +688,10 @@ button {
 @media (max-width: 1240px) {
   .workspace-grid {
     grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  .workspace-grid.is-compose-mode {
+    grid-template-columns: 190px minmax(0, 1fr);
   }
 
   .inspector {
@@ -589,6 +729,16 @@ button {
   .score-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .field-grid,
+  .field-grid.field-grid-third,
+  .bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .viewer-layout.is-compose-mode {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -620,5 +770,12 @@ button {
 
   .viewer-secondary-shell {
     min-height: 220px;
+  }
+
+  .analytic-row,
+  .bottom-table-shell .analytic-row,
+  .bottom-table-shell:last-child .analytic-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }

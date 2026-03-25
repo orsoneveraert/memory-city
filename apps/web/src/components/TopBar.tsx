@@ -1,4 +1,5 @@
 import type { CityVariant, EvaluationReport } from "@memory-city/core-model";
+import type { FabricationSummary } from "../zoneBuilder";
 
 type TopBarProps = {
   variant: CityVariant;
@@ -9,6 +10,7 @@ type TopBarProps = {
   ) => void;
   renderMode: "analytic" | "wood";
   onRenderModeChange: (mode: "analytic" | "wood") => void;
+  fabricationSummary: FabricationSummary;
 };
 
 export function TopBar({
@@ -17,13 +19,16 @@ export function TopBar({
   workspaceMode,
   onWorkspaceModeChange,
   renderMode,
-  onRenderModeChange
+  onRenderModeChange,
+  fabricationSummary
 }: TopBarProps) {
+  const isComposeMode = workspaceMode === "compose";
+
   return (
     <header className="top-bar">
       <div>
-        <p className="eyebrow">Memory City</p>
-        <h1>Mnemonic city-object editor</h1>
+        <p className="eyebrow">{isComposeMode ? "Google zone / wood kit" : "Memory City"}</p>
+        <h1>{isComposeMode ? "Site-to-block editor" : "Mnemonic city-object editor"}</h1>
         <div className="workspace-mode-toggle" role="tablist" aria-label="Workspace mode">
           {(["review", "semantics", "compose", "evaluate", "fabrication"] as const).map((mode) => (
             <button
@@ -44,16 +49,20 @@ export function TopBar({
           <strong>{variant.seed}</strong>
         </div>
         <div className="stat-pill">
-          <span>Blocks</span>
-          <strong>{variant.scene.blocks.length}</strong>
+          <span>{isComposeMode ? "Pieces" : "Blocks"}</span>
+          <strong>{isComposeMode ? fabricationSummary.totalBlocks : variant.scene.blocks.length}</strong>
         </div>
         <div className="stat-pill">
-          <span>Path</span>
-          <strong>{report.metrics.routeLength}</strong>
+          <span>{isComposeMode ? "Maquette" : "Path"}</span>
+          <strong>
+            {isComposeMode
+              ? `${fabricationSummary.widthCm} x ${fabricationSummary.depthCm} cm`
+              : report.metrics.routeLength}
+          </strong>
         </div>
         <div className="stat-pill">
-          <span>Memory</span>
-          <strong>{Math.round(report.profile.memory * 100)}</strong>
+          <span>{isComposeMode ? "Module" : "Memory"}</span>
+          <strong>{isComposeMode ? `${fabricationSummary.moduleCm} cm` : Math.round(report.profile.memory * 100)}</strong>
         </div>
 
         <div className="render-toggle" role="tablist" aria-label="Render mode">

@@ -8,6 +8,13 @@ import { InspectorPanel } from "./components/InspectorPanel";
 import { BottomBar } from "./components/BottomBar";
 import { createDemoWorkspace, DEMO_BLOCK_LIBRARY, DEMO_FABRICATION_PROFILE } from "./demoData";
 import { buildSiteVariantFromGoogleZone } from "./siteImport";
+import {
+  buildZoneBlockLibrary,
+  buildZoneFabricationProfile,
+  summarizeBlockLibrary,
+  summarizeVariantForFabrication,
+  type ZoneImportState
+} from "./zoneBuilder";
 
 const initialWorkspace = createDemoWorkspace();
 
@@ -22,20 +29,26 @@ export default function App() {
   const [selectedSemanticNodeId, setSelectedSemanticNodeId] = useState<string | null>(
     initialWorkspace.variants[0].semanticGraph.nodes[0]?.id ?? null
   );
-  const [siteImportState, setSiteImportState] = useState<{
-    sourceUrl: string;
-    spanMeters: number;
-    status: "idle" | "ready" | "error";
-    message: string;
-  }>({
+  const [siteImportState, setSiteImportState] = useState<ZoneImportState>({
     sourceUrl: "https://www.google.com/maps/@48.8566,2.3522,17z",
     spanMeters: 560,
+    moduleCm: 2,
+    blockStrategy: "generative",
+    uniformWidthCm: 2,
+    uniformDepthCm: 2,
+    uniformHeightCm: 2,
+    typeProfile: "balanced",
     status: "idle",
-    message: "Paste a Google Maps URL or raw lat,lng to seed a woodblock site study."
+    message: "Paste a Google Maps URL or raw lat,lng to build a wood block site study."
   });
 
   const selectedVariant = workspace.variants.find((variant) => variant.id === selectedVariantId) as CityVariant;
   const selectedReport = workspace.reports.get(selectedVariantId)!;
+  const isComposeMode = workspaceMode === "compose";
+  const previewBlockLibrary = buildZoneBlockLibrary(siteImportState, DEMO_BLOCK_LIBRARY);
+  const previewFabricationProfile = buildZoneFabricationProfile(siteImportState, DEMO_FABRICATION_PROFILE);
+  const kitPreview = summarizeBlockLibrary(previewBlockLibrary);
+  const fabricationSummary = summarizeVariantForFabrication(selectedVariant);
 
   function handleSelectVariant(variantId: string) {
     setSelectedVariantId(variantId);
@@ -48,8 +61,9 @@ export default function App() {
       const result = buildSiteVariantFromGoogleZone({
         sourceUrl: siteImportState.sourceUrl,
         spanMeters: siteImportState.spanMeters,
-        blockLibrary: DEMO_BLOCK_LIBRARY,
-        fabricationProfile: DEMO_FABRICATION_PROFILE
+        blockLibrary: previewBlockLibrary,
+        fabricationProfile: previewFabricationProfile,
+        blockStrategy: siteImportState.blockStrategy
       });
 
       startTransition(() => {
@@ -61,7 +75,8 @@ export default function App() {
         setSelectedVariantId(result.variant.id);
         setSelectedSemanticNodeId(result.variant.semanticGraph.nodes[0]?.id ?? null);
         setWorkspaceMode("compose");
-        setPrimaryViewport("plan");
+        setPrimaryViewport("volume");
+        setRenderMode("wood");
       });
 
       setSiteImportState((current) => ({
@@ -78,10 +93,11 @@ export default function App() {
     }
   }
 
-  const secondaryViewport = primaryViewport === "plan" ? "volume" : "plan";
+  const effectivePrimaryViewport = isComposeMode ? "volume" : primaryViewport;
+  const secondaryViewport = isComposeMode ? "plan" : primaryViewport === "plan" ? "volume" : "plan";
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isComposeMode ? "is-compose-mode" : ""}`}>
       <TopBar
         variant={selectedVariant}
         report={selectedReport}
@@ -89,9 +105,10 @@ export default function App() {
         onWorkspaceModeChange={setWorkspaceMode}
         renderMode={renderMode}
         onRenderModeChange={setRenderMode}
+        fabricationSummary={fabricationSummary}
       />
 
-      <div className="workspace-grid">
+      <div className={`workspace-grid ${isComposeMode ? "is-compose-mode" : ""}`}>
         <Sidebar
           variants={workspace.variants}
           reports={workspace.reports}
@@ -99,54 +116,70 @@ export default function App() {
           onSelectVariant={handleSelectVariant}
           selectedSemanticNodeId={selectedSemanticNodeId}
           onSelectSemanticNode={setSelectedSemanticNodeId}
+          workspaceMode={workspaceMode}
+          fabricationSummary={fabricationSummary}
         />
 
-        <main className="main-stage">
+        <main className={`main-stage ${isComposeMode ? "is-compose-mode" : ""}`}>
           <header className="stage-header">
             <div className="stage-title-block">
-              <p className="eyebrow">Viewer</p>
-              <h2>{selectedVariant.name}</h2>
-              <p className="panel-note">{selectedVariant.semanticGraph.title}</p>
+              <p className="eyebrow">{isComposeMode ? "Google zone" : "Viewer"}</p>
+              <h2>{isComposeMode ? "Wood block site study" : selectedVariant.name}</h2>
+              <p className="panel-note">
+                {isComposeMode
+                  ? `${selectedVariant.name} · ${siteImportState.spanMeters} m site span · ${fabricationSummary.strategyLabel}`
+                  : selectedVariant.semanticGraph.title}
+              </p>
             </div>
 
             <div className="stage-controls">
-              <div className="view-toggle" role="tablist" aria-label="Primary viewport">
-                <button
-                  className={primaryViewport === "plan" ? "is-active" : ""}
-                  onClick={() => setPrimaryViewport("plan")}
-                  type="button"
-                >
-                  Plan
-                </button>
-                <button
-                  className={primaryViewport === "volume" ? "is-active" : ""}
-                  onClick={() => setPrimaryViewport("volume")}
-                  type="button"
-                >
-                  Volume
-                </button>
-              </div>
+              {isComposeMode ? null : (
+                <div className="view-toggle" role="tablist" aria-label="Primary viewport">
+                  <button
+                    className={primaryViewport === "plan" ? "is-active" : ""}
+                    onClick={() => setPrimaryViewport("plan")}
+                    type="button"
+                  >
+                    Plan
+                  </button>
+                  <button
+                    className={primaryViewport === "volume" ? "is-active" : ""}
+                    onClick={() => setPrimaryViewport("volume")}
+                    type="button"
+                  >
+                    Volume
+                  </button>
+                </div>
+              )}
 
               <div className="stage-metrics">
                 <div className="stage-metric">
-                  <span>Rule set</span>
-                  <strong>{selectedVariant.ruleSet.name}</strong>
+                  <span>{isComposeMode ? "System" : "Rule set"}</span>
+                  <strong>{isComposeMode ? fabricationSummary.strategyLabel : selectedVariant.ruleSet.name}</strong>
                 </div>
                 <div className="stage-metric">
-                  <span>Blocks</span>
-                  <strong>{selectedVariant.scene.blocks.length}</strong>
+                  <span>{isComposeMode ? "Maquette" : "Blocks"}</span>
+                  <strong>
+                    {isComposeMode
+                      ? `${fabricationSummary.widthCm} x ${fabricationSummary.depthCm} x ${fabricationSummary.heightCm} cm`
+                      : selectedVariant.scene.blocks.length}
+                  </strong>
                 </div>
                 <div className="stage-metric">
-                  <span>Memory</span>
-                  <strong>{Math.round(selectedReport.profile.memory * 100)}</strong>
+                  <span>{isComposeMode ? "Pieces" : "Memory"}</span>
+                  <strong>{isComposeMode ? fabricationSummary.totalBlocks : Math.round(selectedReport.profile.memory * 100)}</strong>
+                </div>
+                <div className="stage-metric">
+                  <span>{isComposeMode ? "Module" : "Path"}</span>
+                  <strong>{isComposeMode ? `${fabricationSummary.moduleCm} cm` : selectedReport.metrics.routeLength}</strong>
                 </div>
               </div>
             </div>
           </header>
 
-          <div className="viewer-layout">
+          <div className={`viewer-layout ${isComposeMode ? "is-compose-mode" : ""}`}>
             <section className="viewer-primary-shell">
-              {primaryViewport === "plan" ? (
+              {effectivePrimaryViewport === "plan" ? (
                 <PlanViewport
                   variant={selectedVariant}
                   selectedSemanticNodeId={selectedSemanticNodeId}
@@ -165,7 +198,9 @@ export default function App() {
             <aside className="viewer-secondary-shell">
               <div className="secondary-label">
                 <p className="eyebrow">Inset</p>
-                <strong>{secondaryViewport === "plan" ? "Plan" : "Volume"}</strong>
+                <strong>
+                  {isComposeMode ? "Construction plan" : secondaryViewport === "plan" ? "Plan" : "Volume"}
+                </strong>
               </div>
               {secondaryViewport === "plan" ? (
                 <PlanViewport
@@ -192,6 +227,8 @@ export default function App() {
           selectedSemanticNodeId={selectedSemanticNodeId}
           diagnostics={workspace.diagnostics.get(selectedVariantId) ?? []}
           siteImportState={siteImportState}
+          kitPreview={kitPreview}
+          fabricationSummary={fabricationSummary}
           onSiteImportSourceChange={(value) =>
             setSiteImportState((current) => ({
               ...current,
@@ -204,6 +241,30 @@ export default function App() {
               spanMeters: value
             }))
           }
+          onSiteImportModuleChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              moduleCm: value
+            }))
+          }
+          onSiteImportBlockStrategyChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              blockStrategy: value
+            }))
+          }
+          onSiteImportUniformShapeChange={(dimension, value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              [dimension]: value
+            }))
+          }
+          onSiteImportTypeProfileChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              typeProfile: value
+            }))
+          }
           onGenerateSiteVariant={handleGenerateSiteVariant}
         />
       </div>
@@ -213,6 +274,8 @@ export default function App() {
         report={selectedReport}
         selectedSemanticNodeId={selectedSemanticNodeId}
         onSelectSemanticNode={setSelectedSemanticNodeId}
+        workspaceMode={workspaceMode}
+        fabricationSummary={fabricationSummary}
       />
     </div>
   );

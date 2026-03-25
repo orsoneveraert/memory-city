@@ -1,4 +1,5 @@
 import type { CityVariant, EvaluationReport } from "@memory-city/core-model";
+import type { FabricationSummary } from "../zoneBuilder";
 
 type SidebarProps = {
   variants: CityVariant[];
@@ -7,6 +8,8 @@ type SidebarProps = {
   selectedSemanticNodeId: string | null;
   onSelectVariant: (variantId: string) => void;
   onSelectSemanticNode: (semanticNodeId: string) => void;
+  workspaceMode: "review" | "semantics" | "compose" | "evaluate" | "fabrication";
+  fabricationSummary: FabricationSummary;
 };
 
 export function Sidebar({
@@ -15,37 +18,70 @@ export function Sidebar({
   selectedVariantId,
   selectedSemanticNodeId,
   onSelectVariant,
-  onSelectSemanticNode
+  onSelectSemanticNode,
+  workspaceMode,
+  fabricationSummary
 }: SidebarProps) {
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId)!;
+  const isComposeMode = workspaceMode === "compose";
+  const sourceNote = selectedVariant.notes.find((note) => note.startsWith("Source URL:"));
+  const spanNote = selectedVariant.notes.find((note) => note.startsWith("Study span:"));
 
   return (
     <aside className="sidebar">
       <section className="sidebar-section">
         <p className="eyebrow">Project</p>
-        <h2>Ars memoriae tabletop study</h2>
+        <h2>{isComposeMode ? "Google zone block study" : "Ars memoriae tabletop study"}</h2>
         <p className="muted">
-          Demo workspace focused on a compact sequence, clear thresholds, and a material language aligned with a wooden kit.
+          {isComposeMode
+            ? "Current workspace translates a mapped zone into a buildable wood block maquette."
+            : "Demo workspace focused on a compact sequence, clear thresholds, and a material language aligned with a wooden kit."}
         </p>
       </section>
 
-      <section className="sidebar-section">
-        <p className="eyebrow">Semantics</p>
-        <ul className="semantic-list">
-          {selectedVariant.semanticGraph.nodes.map((node) => (
-            <li key={node.id}>
-              <button
-                className={`semantic-list-button ${selectedSemanticNodeId === node.id ? "is-active" : ""}`}
-                onClick={() => onSelectSemanticNode(node.id)}
-                type="button"
-              >
-                <span>{node.order}. {node.label}</span>
-                <small>{node.kind}</small>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {isComposeMode ? (
+        <section className="sidebar-section">
+          <p className="eyebrow">Study</p>
+          <div className="metric-list">
+            <div className="metric-row">
+              <span>Footprint</span>
+              <strong>{fabricationSummary.widthCm} x {fabricationSummary.depthCm} cm</strong>
+            </div>
+            <div className="metric-row">
+              <span>Height</span>
+              <strong>{fabricationSummary.heightCm} cm</strong>
+            </div>
+            <div className="metric-row">
+              <span>Pieces</span>
+              <strong>{fabricationSummary.totalBlocks}</strong>
+            </div>
+            <div className="metric-row">
+              <span>Wood volume</span>
+              <strong>{fabricationSummary.totalVolumeCm3} cm3</strong>
+            </div>
+          </div>
+          {sourceNote ? <p className="variant-card-note">{sourceNote.replace("Source URL: ", "")}</p> : null}
+          {spanNote ? <p className="variant-card-note">{spanNote}</p> : null}
+        </section>
+      ) : (
+        <section className="sidebar-section">
+          <p className="eyebrow">Semantics</p>
+          <ul className="semantic-list">
+            {selectedVariant.semanticGraph.nodes.map((node) => (
+              <li key={node.id}>
+                <button
+                  className={`semantic-list-button ${selectedSemanticNodeId === node.id ? "is-active" : ""}`}
+                  onClick={() => onSelectSemanticNode(node.id)}
+                  type="button"
+                >
+                  <span>{node.order}. {node.label}</span>
+                  <small>{node.kind}</small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="sidebar-section">
         <div className="sidebar-heading">
@@ -73,15 +109,17 @@ export function Sidebar({
                   <span>{variant.seed}</span>
                 </div>
                 <div className="variant-card-row variant-card-metrics">
-                  <span>Path {Math.round(report.profile.path * 100)}</span>
+                  <span>{isComposeMode ? `Pieces ${variant.scene.blocks.length}` : `Path ${Math.round(report.profile.path * 100)}`}</span>
                   <span>Form {Math.round(report.profile.form * 100)}</span>
                   <span>Fab {Math.round(report.profile.fabrication * 100)}</span>
                 </div>
                 <div className="variant-card-row variant-card-metrics">
-                  <span>{variant.ruleSet.name}</span>
-                  <span>{variant.blockLibrary.moduleMm} mm</span>
+                  <span>{isComposeMode ? `${variant.footprint.width} x ${variant.footprint.depth} cells` : variant.ruleSet.name}</span>
+                  <span>{variant.blockLibrary.moduleMm / 10} cm</span>
                 </div>
-                <p className="variant-card-note">{report.findings[0]}</p>
+                <p className="variant-card-note">
+                  {isComposeMode ? variant.fabricationProfile.name : report.findings[0]}
+                </p>
               </button>
             );
           })}
