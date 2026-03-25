@@ -119,6 +119,8 @@ export function SceneViewport({
   selectedSemanticNodeId,
   onSelectSemanticNode
 }: SceneViewportProps) {
+  const trayTexture = renderMode === "wood" ? createWoodTexture("tray-base") : null;
+
   return (
     <div className="viewport scene-viewport">
       <Canvas camera={{ position: [8, 9, 12], fov: 42 }} shadows>
@@ -132,9 +134,19 @@ export function SceneViewport({
           shadow-mapSize-height={1024}
         />
 
-        <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, 0]} receiveShadow>
-          <planeGeometry args={[variant.footprint.width + 3, variant.footprint.depth + 3]} />
-          <meshStandardMaterial color="#ffffff" roughness={1} />
+        <mesh position={[0, -0.22, 0]} receiveShadow castShadow>
+          <boxGeometry args={[variant.footprint.width + 2.6, 0.18, variant.footprint.depth + 2.6]} />
+          <meshStandardMaterial
+            color={renderMode === "wood" ? "#cfab7f" : "#f4f2ed"}
+            map={trayTexture}
+            roughness={0.9}
+            metalness={0.02}
+          />
+        </mesh>
+
+        <mesh rotation-x={-Math.PI / 2} position={[0, -0.12, 0]} receiveShadow>
+          <planeGeometry args={[variant.footprint.width + 1.9, variant.footprint.depth + 1.9]} />
+          <meshStandardMaterial color={renderMode === "wood" ? "#d8b58a" : "#ffffff"} map={trayTexture} roughness={1} />
         </mesh>
 
         {variant.scene.blocks.map((block) => (
