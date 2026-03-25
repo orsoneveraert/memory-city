@@ -122,7 +122,7 @@ export function SceneViewport({
   return (
     <div className="viewport scene-viewport">
       <Canvas camera={{ position: [8, 9, 12], fov: 42 }} shadows>
-        <color attach="background" args={["#f4eee3"]} />
+        <color attach="background" args={["#ffffff"]} />
         <ambientLight intensity={0.9} />
         <directionalLight
           castShadow
@@ -134,7 +134,7 @@ export function SceneViewport({
 
         <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, 0]} receiveShadow>
           <planeGeometry args={[variant.footprint.width + 3, variant.footprint.depth + 3]} />
-          <meshStandardMaterial color="#e7dcc9" roughness={1} />
+          <meshStandardMaterial color="#ffffff" roughness={1} />
         </mesh>
 
         {variant.scene.blocks.map((block) => (

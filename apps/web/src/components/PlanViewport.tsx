@@ -50,7 +50,7 @@ export function PlanViewport({ variant, selectedSemanticNodeId, onSelectSemantic
           </pattern>
         </defs>
 
-        <rect width={width} height={height} fill="#f7f2e8" />
+        <rect width={width} height={height} fill="#ffffff" />
         <rect width={width} height={height} fill="url(#grid)" opacity="0.8" />
 
         {variant.scene.voids.map((voidCell) => (

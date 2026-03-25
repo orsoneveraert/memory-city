@@ -1,19 +1,19 @@
 :root {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   color: #161616;
-  background: #f0efe9;
+  background: #ffffff;
   line-height: 1.35;
   font-weight: 400;
   color-scheme: light;
-  --page: #f0efe9;
-  --panel: #fbfaf6;
+  --page: #ffffff;
+  --panel: #ffffff;
   --ink: #161616;
   --muted: #666258;
   --line: #d3d0c7;
   --line-strong: #a9a398;
   --accent: #7a4a1e;
-  --accent-soft: #ece4d8;
-  --table: #f7f5ef;
+  --accent-soft: #f5f2ec;
+  --table: #ffffff;
 }
 
 * {
@@ -57,6 +57,28 @@ button {
 .main-stage {
   background: var(--panel);
   border: 1px solid var(--line);
+}
+
+.top-bar > *,
+.sidebar > *,
+.inspector > *,
+.main-stage > *,
+.stage-title-block,
+.stage-controls,
+.stage-metrics,
+.viewer-layout,
+.viewer-primary-shell,
+.viewer-secondary-shell,
+.secondary-label,
+.bottom-strip,
+.variant-card,
+.semantic-list-button,
+.semantic-card,
+.finding-list p,
+.editorial-note,
+.form-block,
+.status-strip {
+  min-width: 0;
 }
 
 .top-bar {
@@ -215,12 +237,14 @@ button {
 .stage-title-block {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .stage-controls {
   gap: 10px;
   justify-content: flex-end;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .stage-metrics {
@@ -266,7 +290,7 @@ button {
 
 .viewport {
   overflow: hidden;
-  background: #f7f5ef;
+  background: #ffffff;
 }
 
 .plan-viewport,
@@ -319,6 +343,7 @@ button {
   color: var(--ink);
   text-align: left;
   padding: 8px 0;
+  overflow-wrap: anywhere;
 }
 
 .semantic-list-button {
@@ -350,6 +375,7 @@ button {
   margin: 0;
   font-size: 0.71rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .variant-card-metrics {
@@ -403,6 +429,7 @@ button {
 .semantic-card p,
 .finding-list p {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .table-block,
@@ -422,6 +449,7 @@ button {
   margin: 0;
   color: var(--muted);
   font-size: 0.74rem;
+  overflow-wrap: anywhere;
 }
 
 .field-label {
@@ -438,6 +466,7 @@ button {
   padding: 8px;
   color: var(--ink);
   resize: vertical;
+  min-width: 0;
 }
 
 .text-input-small {
@@ -467,6 +496,21 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-size: 0.62rem;
+}
+
+.status-strip span,
+.panel-note,
+.muted,
+.chip,
+.stat-pill,
+.stage-metric,
+.table-row,
+.metric-row,
+.stage-title-block h2,
+.top-bar h1,
+.sidebar h2,
+.sidebar h3 {
+  overflow-wrap: anywhere;
 }
 
 .status-strip.is-error {
@@ -538,7 +582,43 @@ button {
     justify-content: flex-start;
   }
 
+  .viewer-primary-shell {
+    min-height: 52vh;
+  }
+
   .score-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .top-bar,
+  .sidebar,
+  .inspector,
+  .bottom-bar,
+  .main-stage {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+
+  .workspace-mode-toggle button,
+  .render-toggle button,
+  .view-toggle button,
+  .primary-button {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .score-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .viewer-secondary-shell {
+    min-height: 220px;
   }
 }
