@@ -6,6 +6,15 @@ type InspectorPanelProps = {
   workspaceMode: "review" | "semantics" | "compose" | "evaluate" | "fabrication";
   selectedSemanticNodeId: string | null;
   diagnostics: string[];
+  siteImportState: {
+    sourceUrl: string;
+    spanMeters: number;
+    status: "idle" | "ready" | "error";
+    message: string;
+  };
+  onSiteImportSourceChange: (value: string) => void;
+  onSiteImportSpanChange: (value: number) => void;
+  onGenerateSiteVariant: () => void;
 };
 
 export function InspectorPanel({
@@ -13,7 +22,11 @@ export function InspectorPanel({
   report,
   workspaceMode,
   selectedSemanticNodeId,
-  diagnostics
+  diagnostics,
+  siteImportState,
+  onSiteImportSourceChange,
+  onSiteImportSpanChange,
+  onGenerateSiteVariant
 }: InspectorPanelProps) {
   const selectedNode = variant.semanticGraph.nodes.find((node) => node.id === selectedSemanticNodeId) ?? null;
 
@@ -82,11 +95,67 @@ export function InspectorPanel({
       {workspaceMode === "compose" ? (
         <section className="inspector-section">
           <p className="eyebrow">Compose mode</p>
-          <ul className="plain-list">
-            <li>{variant.ruleSet.name}</li>
-            <li>{variant.ruleSet.notes[0]}</li>
-            <li>{variant.ruleSet.notes[1]}</li>
-          </ul>
+          <div className="table-block">
+            <div className="table-row">
+              <span>Generator</span>
+              <strong>{variant.ruleSet.name}</strong>
+            </div>
+            <div className="table-row">
+              <span>Family</span>
+              <strong>{variant.ruleSet.generatorFamily}</strong>
+            </div>
+            <div className="table-row">
+              <span>Block module</span>
+              <strong>{variant.blockLibrary.moduleMm} mm</strong>
+            </div>
+          </div>
+
+          <div className="editorial-note">
+            <p>{variant.ruleSet.notes[0]}</p>
+            <p>{variant.ruleSet.notes[1]}</p>
+          </div>
+
+          <div className="form-block">
+            <p className="eyebrow">Geographic adapter</p>
+            <label className="field-label" htmlFor="site-url">
+              Google Maps URL or raw lat,lng
+            </label>
+            <textarea
+              id="site-url"
+              className="text-input"
+              rows={3}
+              value={siteImportState.sourceUrl}
+              onChange={(event) => onSiteImportSourceChange(event.target.value)}
+            />
+
+            <label className="field-label" htmlFor="site-span">
+              Study span in meters
+            </label>
+            <input
+              id="site-span"
+              className="text-input text-input-small"
+              type="number"
+              min={160}
+              max={2000}
+              step={20}
+              value={siteImportState.spanMeters}
+              onChange={(event) => onSiteImportSpanChange(Number(event.target.value))}
+            />
+
+            <button className="primary-button" onClick={onGenerateSiteVariant} type="button">
+              Build zone study
+            </button>
+
+            <div className={`status-strip is-${siteImportState.status}`}>
+              <strong>{siteImportState.status}</strong>
+              <span>{siteImportState.message}</span>
+            </div>
+
+            <div className="editorial-note">
+              <p>This first adapter parses the Google Maps zone and builds a geospatially seeded woodblock study.</p>
+              <p>Direct Google photorealistic 3D scan sampling is a next adapter, because it requires the Map Tiles API and streamed 3D tiles.</p>
+            </div>
+          </div>
         </section>
       ) : null}
 

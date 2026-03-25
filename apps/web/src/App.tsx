@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { startTransition, useState } from "react";
 import type { CityVariant } from "@memory-city/core-model";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
@@ -6,27 +6,79 @@ import { PlanViewport } from "./components/PlanViewport";
 import { SceneViewport } from "./components/SceneViewport";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { BottomBar } from "./components/BottomBar";
-import { createDemoWorkspace } from "./demoData";
+import { createDemoWorkspace, DEMO_BLOCK_LIBRARY, DEMO_FABRICATION_PROFILE } from "./demoData";
+import { buildSiteVariantFromGoogleZone } from "./siteImport";
+
+const initialWorkspace = createDemoWorkspace();
 
 export default function App() {
-  const [{ variants, reports, diagnostics }] = useState(() => createDemoWorkspace());
-  const [selectedVariantId, setSelectedVariantId] = useState(variants[0].id);
+  const [workspace, setWorkspace] = useState(() => initialWorkspace);
+  const [selectedVariantId, setSelectedVariantId] = useState(initialWorkspace.variants[0].id);
   const [renderMode, setRenderMode] = useState<"analytic" | "wood">("wood");
   const [workspaceMode, setWorkspaceMode] = useState<
     "review" | "semantics" | "compose" | "evaluate" | "fabrication"
   >("review");
+  const [primaryViewport, setPrimaryViewport] = useState<"plan" | "volume">("volume");
   const [selectedSemanticNodeId, setSelectedSemanticNodeId] = useState<string | null>(
-    variants[0].semanticGraph.nodes[0]?.id ?? null
+    initialWorkspace.variants[0].semanticGraph.nodes[0]?.id ?? null
   );
+  const [siteImportState, setSiteImportState] = useState<{
+    sourceUrl: string;
+    spanMeters: number;
+    status: "idle" | "ready" | "error";
+    message: string;
+  }>({
+    sourceUrl: "https://www.google.com/maps/@48.8566,2.3522,17z",
+    spanMeters: 560,
+    status: "idle",
+    message: "Paste a Google Maps URL or raw lat,lng to seed a woodblock site study."
+  });
 
-  const selectedVariant = variants.find((variant) => variant.id === selectedVariantId) as CityVariant;
-  const selectedReport = reports.get(selectedVariantId)!;
+  const selectedVariant = workspace.variants.find((variant) => variant.id === selectedVariantId) as CityVariant;
+  const selectedReport = workspace.reports.get(selectedVariantId)!;
 
   function handleSelectVariant(variantId: string) {
     setSelectedVariantId(variantId);
-    const variant = variants.find((entry) => entry.id === variantId);
+    const variant = workspace.variants.find((entry) => entry.id === variantId);
     setSelectedSemanticNodeId(variant?.semanticGraph.nodes[0]?.id ?? null);
   }
+
+  function handleGenerateSiteVariant() {
+    try {
+      const result = buildSiteVariantFromGoogleZone({
+        sourceUrl: siteImportState.sourceUrl,
+        spanMeters: siteImportState.spanMeters,
+        blockLibrary: DEMO_BLOCK_LIBRARY,
+        fabricationProfile: DEMO_FABRICATION_PROFILE
+      });
+
+      startTransition(() => {
+        setWorkspace((current) => ({
+          variants: [result.variant, ...current.variants.filter((entry) => entry.id !== result.variant.id)],
+          reports: new Map(current.reports).set(result.variant.id, result.report),
+          diagnostics: new Map(current.diagnostics).set(result.variant.id, result.diagnostics)
+        }));
+        setSelectedVariantId(result.variant.id);
+        setSelectedSemanticNodeId(result.variant.semanticGraph.nodes[0]?.id ?? null);
+        setWorkspaceMode("compose");
+        setPrimaryViewport("plan");
+      });
+
+      setSiteImportState((current) => ({
+        ...current,
+        status: "ready",
+        message: result.summary
+      }));
+    } catch (error) {
+      setSiteImportState((current) => ({
+        ...current,
+        status: "error",
+        message: error instanceof Error ? error.message : "Could not build a site study from this zone."
+      }));
+    }
+  }
+
+  const secondaryViewport = primaryViewport === "plan" ? "volume" : "plan";
 
   return (
     <div className="app-shell">
@@ -41,8 +93,8 @@ export default function App() {
 
       <div className="workspace-grid">
         <Sidebar
-          variants={variants}
-          reports={reports}
+          variants={workspace.variants}
+          reports={workspace.reports}
           selectedVariantId={selectedVariantId}
           onSelectVariant={handleSelectVariant}
           selectedSemanticNodeId={selectedSemanticNodeId}
@@ -50,36 +102,87 @@ export default function App() {
         />
 
         <main className="main-stage">
-          <section className="viewport-panel">
-            <header className="panel-header">
-              <div>
-                <p className="eyebrow">Plan</p>
-                <h2>Mnemonic route and linked footprint</h2>
-              </div>
-              <p className="panel-note">Selecting a concept now highlights its route anchor and physical block in every view.</p>
-            </header>
-            <PlanViewport
-              variant={selectedVariant}
-              selectedSemanticNodeId={selectedSemanticNodeId}
-              onSelectSemanticNode={setSelectedSemanticNodeId}
-            />
-          </section>
+          <header className="stage-header">
+            <div className="stage-title-block">
+              <p className="eyebrow">Viewer</p>
+              <h2>{selectedVariant.name}</h2>
+              <p className="panel-note">{selectedVariant.semanticGraph.title}</p>
+            </div>
 
-          <section className="viewport-panel">
-            <header className="panel-header">
-              <div>
-                <p className="eyebrow">Volume</p>
-                <h2>3D material preview</h2>
+            <div className="stage-controls">
+              <div className="view-toggle" role="tablist" aria-label="Primary viewport">
+                <button
+                  className={primaryViewport === "plan" ? "is-active" : ""}
+                  onClick={() => setPrimaryViewport("plan")}
+                  type="button"
+                >
+                  Plan
+                </button>
+                <button
+                  className={primaryViewport === "volume" ? "is-active" : ""}
+                  onClick={() => setPrimaryViewport("volume")}
+                  type="button"
+                >
+                  Volume
+                </button>
               </div>
-              <p className="panel-note">Toggle between analytic and wood mode to compare form and material expression.</p>
-            </header>
-            <SceneViewport
-              variant={selectedVariant}
-              renderMode={renderMode}
-              selectedSemanticNodeId={selectedSemanticNodeId}
-              onSelectSemanticNode={setSelectedSemanticNodeId}
-            />
-          </section>
+
+              <div className="stage-metrics">
+                <div className="stage-metric">
+                  <span>Rule set</span>
+                  <strong>{selectedVariant.ruleSet.name}</strong>
+                </div>
+                <div className="stage-metric">
+                  <span>Blocks</span>
+                  <strong>{selectedVariant.scene.blocks.length}</strong>
+                </div>
+                <div className="stage-metric">
+                  <span>Memory</span>
+                  <strong>{Math.round(selectedReport.profile.memory * 100)}</strong>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="viewer-layout">
+            <section className="viewer-primary-shell">
+              {primaryViewport === "plan" ? (
+                <PlanViewport
+                  variant={selectedVariant}
+                  selectedSemanticNodeId={selectedSemanticNodeId}
+                  onSelectSemanticNode={setSelectedSemanticNodeId}
+                />
+              ) : (
+                <SceneViewport
+                  variant={selectedVariant}
+                  renderMode={renderMode}
+                  selectedSemanticNodeId={selectedSemanticNodeId}
+                  onSelectSemanticNode={setSelectedSemanticNodeId}
+                />
+              )}
+            </section>
+
+            <aside className="viewer-secondary-shell">
+              <div className="secondary-label">
+                <p className="eyebrow">Inset</p>
+                <strong>{secondaryViewport === "plan" ? "Plan" : "Volume"}</strong>
+              </div>
+              {secondaryViewport === "plan" ? (
+                <PlanViewport
+                  variant={selectedVariant}
+                  selectedSemanticNodeId={selectedSemanticNodeId}
+                  onSelectSemanticNode={setSelectedSemanticNodeId}
+                />
+              ) : (
+                <SceneViewport
+                  variant={selectedVariant}
+                  renderMode={renderMode}
+                  selectedSemanticNodeId={selectedSemanticNodeId}
+                  onSelectSemanticNode={setSelectedSemanticNodeId}
+                />
+              )}
+            </aside>
+          </div>
         </main>
 
         <InspectorPanel
@@ -87,7 +190,21 @@ export default function App() {
           report={selectedReport}
           workspaceMode={workspaceMode}
           selectedSemanticNodeId={selectedSemanticNodeId}
-          diagnostics={diagnostics.get(selectedVariantId) ?? []}
+          diagnostics={workspace.diagnostics.get(selectedVariantId) ?? []}
+          siteImportState={siteImportState}
+          onSiteImportSourceChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              sourceUrl: value
+            }))
+          }
+          onSiteImportSpanChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              spanMeters: value
+            }))
+          }
+          onGenerateSiteVariant={handleGenerateSiteVariant}
         />
       </div>
 
