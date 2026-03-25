@@ -2,12 +2,14 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { BlockType, CityVariant } from "@memory-city/core-model";
+import type { SiteStudy } from "../rasterSiteImport";
 
 type SceneViewportProps = {
   variant: CityVariant;
   renderMode: "analytic" | "wood";
   selectedSemanticNodeId: string | null;
   onSelectSemanticNode: (semanticNodeId: string) => void;
+  study?: SiteStudy | null;
 };
 
 const familyColors: Record<BlockType["family"], string> = {
@@ -71,20 +73,22 @@ function BlockMesh({
   block,
   renderMode,
   selectedSemanticNodeId,
-  onSelectSemanticNode
+  onSelectSemanticNode,
+  baseLevel
 }: {
   variant: CityVariant;
   block: CityVariant["scene"]["blocks"][number];
   renderMode: "analytic" | "wood";
   selectedSemanticNodeId: string | null;
   onSelectSemanticNode: (semanticNodeId: string) => void;
+  baseLevel: number;
 }) {
   const type = getType(variant, block.typeId);
   const width = block.rotation === 90 ? type.depth : type.width;
   const depth = block.rotation === 90 ? type.width : type.depth;
   const position: [number, number, number] = [
     block.x + width / 2 - variant.footprint.width / 2,
-    type.height / 2,
+    baseLevel + type.height / 2,
     block.y + depth / 2 - variant.footprint.depth / 2
   ];
 
@@ -117,9 +121,11 @@ export function SceneViewport({
   variant,
   renderMode,
   selectedSemanticNodeId,
-  onSelectSemanticNode
+  onSelectSemanticNode,
+  study = null
 }: SceneViewportProps) {
   const trayTexture = renderMode === "wood" ? createWoodTexture("tray-base") : null;
+  const terrainTiles = study?.terrainCells ?? [];
 
   return (
     <div className="viewport scene-viewport">
@@ -149,6 +155,27 @@ export function SceneViewport({
           <meshStandardMaterial color={renderMode === "wood" ? "#d8b58a" : "#ffffff"} map={trayTexture} roughness={1} />
         </mesh>
 
+        {terrainTiles.map((cell) => (
+          <mesh
+            key={`terrain-${cell.x}-${cell.y}`}
+            position={[
+              cell.x + 0.5 - variant.footprint.width / 2,
+              cell.tier * 0.14 - 0.03,
+              cell.y + 0.5 - variant.footprint.depth / 2
+            ]}
+            receiveShadow
+            castShadow
+          >
+            <boxGeometry args={[1, cell.tier * 0.28, 1]} />
+            <meshStandardMaterial
+              color={renderMode === "wood" ? "#cfa97e" : "#efe7dc"}
+              map={trayTexture}
+              roughness={0.96}
+              metalness={0.01}
+            />
+          </mesh>
+        ))}
+
         {variant.scene.blocks.map((block) => (
           <BlockMesh
             key={block.id}
@@ -157,18 +184,20 @@ export function SceneViewport({
             renderMode={renderMode}
             selectedSemanticNodeId={selectedSemanticNodeId}
             onSelectSemanticNode={onSelectSemanticNode}
+            baseLevel={(study?.blockBaseLevels[block.id] ?? 0) * 0.28}
           />
         ))}
 
         {variant.scene.route.map((step) => {
           const semanticNodeId = step.semanticNodeId;
+          const baseLevel = step.x >= 0 && step.y >= 0 ? study?.terrainCells.find((cell) => cell.x === step.x && cell.y === step.y)?.tier ?? 0 : 0;
 
           return (
             <mesh
               key={step.id}
               position={[
                 step.x + 0.5 - variant.footprint.width / 2,
-                0.08,
+                baseLevel * 0.28 + 0.08,
                 step.y + 0.5 - variant.footprint.depth / 2
               ]}
               rotation-x={-Math.PI / 2}

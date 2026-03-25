@@ -6,8 +6,10 @@ import { PlanViewport } from "./components/PlanViewport";
 import { SceneViewport } from "./components/SceneViewport";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { BottomBar } from "./components/BottomBar";
+import { ReferenceViewport } from "./components/ReferenceViewport";
 import { createDemoWorkspace, DEMO_BLOCK_LIBRARY, DEMO_FABRICATION_PROFILE } from "./demoData";
 import { buildSiteVariantFromGoogleZone } from "./siteImport";
+import { buildRasterSiteVariantFromGoogleZone, type SiteStudy } from "./rasterSiteImport";
 import {
   buildZoneBlockLibrary,
   buildZoneFabricationProfile,
@@ -20,6 +22,7 @@ const initialWorkspace = createDemoWorkspace();
 
 export default function App() {
   const [workspace, setWorkspace] = useState(() => initialWorkspace);
+  const [siteStudies, setSiteStudies] = useState<Map<string, SiteStudy>>(() => new Map());
   const [selectedVariantId, setSelectedVariantId] = useState(initialWorkspace.variants[0].id);
   const [renderMode, setRenderMode] = useState<"analytic" | "wood">("wood");
   const [workspaceMode, setWorkspaceMode] = useState<
@@ -33,6 +36,10 @@ export default function App() {
     sourceUrl: "https://www.google.com/maps/@48.8566,2.3522,17z",
     spanMeters: 560,
     moduleCm: 2,
+    dataMode: "open-raster",
+    terrainMode: "stepped",
+    urbanPreset: "compact-core",
+    abstractionRatio: 55,
     blockStrategy: "generative",
     uniformWidthCm: 2,
     uniformDepthCm: 2,
@@ -48,7 +55,8 @@ export default function App() {
   const previewBlockLibrary = buildZoneBlockLibrary(siteImportState, DEMO_BLOCK_LIBRARY);
   const previewFabricationProfile = buildZoneFabricationProfile(siteImportState, DEMO_FABRICATION_PROFILE);
   const kitPreview = summarizeBlockLibrary(previewBlockLibrary);
-  const fabricationSummary = summarizeVariantForFabrication(selectedVariant);
+  const selectedStudy = siteStudies.get(selectedVariantId) ?? null;
+  const fabricationSummary = summarizeVariantForFabrication(selectedVariant, selectedStudy);
 
   function handleSelectVariant(variantId: string) {
     setSelectedVariantId(variantId);
@@ -56,15 +64,37 @@ export default function App() {
     setSelectedSemanticNodeId(variant?.semanticGraph.nodes[0]?.id ?? null);
   }
 
-  function handleGenerateSiteVariant() {
+  async function handleGenerateSiteVariant() {
+    setSiteImportState((current) => ({
+      ...current,
+      status: "loading",
+      message:
+        current.dataMode === "open-raster"
+          ? "Sampling open map tiles and building a reference study."
+          : "Building a seeded abstraction from the zone."
+    }));
+
     try {
-      const result = buildSiteVariantFromGoogleZone({
-        sourceUrl: siteImportState.sourceUrl,
-        spanMeters: siteImportState.spanMeters,
-        blockLibrary: previewBlockLibrary,
-        fabricationProfile: previewFabricationProfile,
-        blockStrategy: siteImportState.blockStrategy
-      });
+      const result =
+        siteImportState.dataMode === "open-raster"
+          ? await buildRasterSiteVariantFromGoogleZone({
+              sourceUrl: siteImportState.sourceUrl,
+              spanMeters: siteImportState.spanMeters,
+              blockLibrary: previewBlockLibrary,
+              fabricationProfile: previewFabricationProfile,
+              blockStrategy: siteImportState.blockStrategy,
+              urbanPreset: siteImportState.urbanPreset,
+              terrainMode: siteImportState.terrainMode,
+              abstractionRatio: siteImportState.abstractionRatio
+            })
+          : buildSiteVariantFromGoogleZone({
+              sourceUrl: siteImportState.sourceUrl,
+              spanMeters: siteImportState.spanMeters,
+              blockLibrary: previewBlockLibrary,
+              fabricationProfile: previewFabricationProfile,
+              blockStrategy: siteImportState.blockStrategy
+            });
+      const importedStudy: SiteStudy | null = "study" in result ? (result as { study: SiteStudy }).study : null;
 
       startTransition(() => {
         setWorkspace((current) => ({
@@ -72,6 +102,15 @@ export default function App() {
           reports: new Map(current.reports).set(result.variant.id, result.report),
           diagnostics: new Map(current.diagnostics).set(result.variant.id, result.diagnostics)
         }));
+        setSiteStudies((current) => {
+          const next = new Map(current);
+          if (importedStudy) {
+            next.set(result.variant.id, importedStudy);
+          } else {
+            next.delete(result.variant.id);
+          }
+          return next;
+        });
         setSelectedVariantId(result.variant.id);
         setSelectedSemanticNodeId(result.variant.semanticGraph.nodes[0]?.id ?? null);
         setWorkspaceMode("compose");
@@ -106,6 +145,7 @@ export default function App() {
         renderMode={renderMode}
         onRenderModeChange={setRenderMode}
         fabricationSummary={fabricationSummary}
+        siteStudy={selectedStudy}
       />
 
       <div className={`workspace-grid ${isComposeMode ? "is-compose-mode" : ""}`}>
@@ -118,6 +158,7 @@ export default function App() {
           onSelectSemanticNode={setSelectedSemanticNodeId}
           workspaceMode={workspaceMode}
           fabricationSummary={fabricationSummary}
+          siteStudy={selectedStudy}
         />
 
         <main className={`main-stage ${isComposeMode ? "is-compose-mode" : ""}`}>
@@ -191,32 +232,56 @@ export default function App() {
                   renderMode={renderMode}
                   selectedSemanticNodeId={selectedSemanticNodeId}
                   onSelectSemanticNode={setSelectedSemanticNodeId}
+                  study={selectedStudy}
                 />
               )}
             </section>
 
-            <aside className="viewer-secondary-shell">
-              <div className="secondary-label">
-                <p className="eyebrow">Inset</p>
-                <strong>
-                  {isComposeMode ? "Construction plan" : secondaryViewport === "plan" ? "Plan" : "Volume"}
-                </strong>
-              </div>
-              {secondaryViewport === "plan" ? (
-                <PlanViewport
-                  variant={selectedVariant}
-                  selectedSemanticNodeId={selectedSemanticNodeId}
-                  onSelectSemanticNode={setSelectedSemanticNodeId}
-                />
-              ) : (
-                <SceneViewport
-                  variant={selectedVariant}
-                  renderMode={renderMode}
-                  selectedSemanticNodeId={selectedSemanticNodeId}
-                  onSelectSemanticNode={setSelectedSemanticNodeId}
-                />
-              )}
-            </aside>
+            {isComposeMode ? (
+              <aside className="viewer-secondary-shell viewer-secondary-shell-compose">
+                <section className="subview-shell">
+                  <div className="secondary-label">
+                    <p className="eyebrow">Inset</p>
+                    <strong>Construction plan</strong>
+                  </div>
+                  <PlanViewport
+                    variant={selectedVariant}
+                    selectedSemanticNodeId={selectedSemanticNodeId}
+                    onSelectSemanticNode={setSelectedSemanticNodeId}
+                  />
+                </section>
+
+                <section className="subview-shell">
+                  <div className="secondary-label">
+                    <p className="eyebrow">Split compare</p>
+                    <strong>Reality reference</strong>
+                  </div>
+                  <ReferenceViewport variant={selectedVariant} study={selectedStudy} overlayBlocks />
+                </section>
+              </aside>
+            ) : (
+              <aside className="viewer-secondary-shell">
+                <div className="secondary-label">
+                  <p className="eyebrow">Inset</p>
+                  <strong>{secondaryViewport === "plan" ? "Plan" : "Volume"}</strong>
+                </div>
+                {secondaryViewport === "plan" ? (
+                  <PlanViewport
+                    variant={selectedVariant}
+                    selectedSemanticNodeId={selectedSemanticNodeId}
+                    onSelectSemanticNode={setSelectedSemanticNodeId}
+                  />
+                ) : (
+                  <SceneViewport
+                    variant={selectedVariant}
+                    renderMode={renderMode}
+                    selectedSemanticNodeId={selectedSemanticNodeId}
+                    onSelectSemanticNode={setSelectedSemanticNodeId}
+                    study={selectedStudy}
+                  />
+                )}
+              </aside>
+            )}
           </div>
         </main>
 
@@ -229,6 +294,7 @@ export default function App() {
           siteImportState={siteImportState}
           kitPreview={kitPreview}
           fabricationSummary={fabricationSummary}
+          siteStudy={selectedStudy}
           onSiteImportSourceChange={(value) =>
             setSiteImportState((current) => ({
               ...current,
@@ -245,6 +311,30 @@ export default function App() {
             setSiteImportState((current) => ({
               ...current,
               moduleCm: value
+            }))
+          }
+          onSiteImportDataModeChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              dataMode: value
+            }))
+          }
+          onSiteImportTerrainModeChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              terrainMode: value
+            }))
+          }
+          onSiteImportUrbanPresetChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              urbanPreset: value
+            }))
+          }
+          onSiteImportAbstractionChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              abstractionRatio: value
             }))
           }
           onSiteImportBlockStrategyChange={(value) =>
@@ -276,6 +366,7 @@ export default function App() {
         onSelectSemanticNode={setSelectedSemanticNodeId}
         workspaceMode={workspaceMode}
         fabricationSummary={fabricationSummary}
+        siteStudy={selectedStudy}
       />
     </div>
   );

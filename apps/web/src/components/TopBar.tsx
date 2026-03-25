@@ -1,5 +1,6 @@
 import type { CityVariant, EvaluationReport } from "@memory-city/core-model";
 import type { FabricationSummary } from "../zoneBuilder";
+import type { SiteStudy } from "../rasterSiteImport";
 
 type TopBarProps = {
   variant: CityVariant;
@@ -11,6 +12,7 @@ type TopBarProps = {
   renderMode: "analytic" | "wood";
   onRenderModeChange: (mode: "analytic" | "wood") => void;
   fabricationSummary: FabricationSummary;
+  siteStudy?: SiteStudy | null;
 };
 
 export function TopBar({
@@ -20,7 +22,8 @@ export function TopBar({
   onWorkspaceModeChange,
   renderMode,
   onRenderModeChange,
-  fabricationSummary
+  fabricationSummary,
+  siteStudy = null
 }: TopBarProps) {
   const isComposeMode = workspaceMode === "compose";
 
@@ -64,6 +67,12 @@ export function TopBar({
           <span>{isComposeMode ? "Module" : "Memory"}</span>
           <strong>{isComposeMode ? `${fabricationSummary.moduleCm} cm` : Math.round(report.profile.memory * 100)}</strong>
         </div>
+        {isComposeMode && siteStudy ? (
+          <div className="stat-pill">
+            <span>Source</span>
+            <strong>{siteStudy.metrics.buildingClusters} clusters</strong>
+          </div>
+        ) : null}
 
         <div className="render-toggle" role="tablist" aria-label="Render mode">
           <button

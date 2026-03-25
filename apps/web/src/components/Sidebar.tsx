@@ -1,5 +1,6 @@
 import type { CityVariant, EvaluationReport } from "@memory-city/core-model";
 import type { FabricationSummary } from "../zoneBuilder";
+import type { SiteStudy } from "../rasterSiteImport";
 
 type SidebarProps = {
   variants: CityVariant[];
@@ -10,6 +11,7 @@ type SidebarProps = {
   onSelectSemanticNode: (semanticNodeId: string) => void;
   workspaceMode: "review" | "semantics" | "compose" | "evaluate" | "fabrication";
   fabricationSummary: FabricationSummary;
+  siteStudy: SiteStudy | null;
 };
 
 export function Sidebar({
@@ -20,7 +22,8 @@ export function Sidebar({
   onSelectVariant,
   onSelectSemanticNode,
   workspaceMode,
-  fabricationSummary
+  fabricationSummary,
+  siteStudy
 }: SidebarProps) {
   const selectedVariant = variants.find((variant) => variant.id === selectedVariantId)!;
   const isComposeMode = workspaceMode === "compose";
@@ -59,9 +62,16 @@ export function Sidebar({
               <span>Wood volume</span>
               <strong>{fabricationSummary.totalVolumeCm3} cm3</strong>
             </div>
+            {siteStudy ? (
+              <div className="metric-row">
+                <span>Source cells</span>
+                <strong>{siteStudy.metrics.buildingCells}</strong>
+              </div>
+            ) : null}
           </div>
           {sourceNote ? <p className="variant-card-note">{sourceNote.replace("Source URL: ", "")}</p> : null}
           {spanNote ? <p className="variant-card-note">{spanNote}</p> : null}
+          {siteStudy ? <p className="variant-card-note">{siteStudy.referenceLabel}</p> : null}
         </section>
       ) : (
         <section className="sidebar-section">

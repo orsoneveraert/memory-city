@@ -3,9 +3,18 @@ import type {
   BlockPreviewRow,
   FabricationSummary,
   ZoneBlockStrategy,
+  ZoneDataMode,
   ZoneImportState,
+  ZoneTerrainMode,
   ZoneTypeProfile
 } from "../zoneBuilder";
+import {
+  ZONE_DATA_MODE_LABELS,
+  ZONE_TERRAIN_MODE_LABELS,
+  ZONE_URBAN_PRESET_LABELS,
+  type ZoneUrbanPreset
+} from "../zoneBuilder";
+import type { SiteStudy } from "../rasterSiteImport";
 
 type InspectorPanelProps = {
   variant: CityVariant;
@@ -16,9 +25,14 @@ type InspectorPanelProps = {
   siteImportState: ZoneImportState;
   kitPreview: BlockPreviewRow[];
   fabricationSummary: FabricationSummary;
+  siteStudy: SiteStudy | null;
   onSiteImportSourceChange: (value: string) => void;
   onSiteImportSpanChange: (value: number) => void;
   onSiteImportModuleChange: (value: number) => void;
+  onSiteImportDataModeChange: (value: ZoneDataMode) => void;
+  onSiteImportTerrainModeChange: (value: ZoneTerrainMode) => void;
+  onSiteImportUrbanPresetChange: (value: ZoneUrbanPreset) => void;
+  onSiteImportAbstractionChange: (value: number) => void;
   onSiteImportBlockStrategyChange: (value: ZoneBlockStrategy) => void;
   onSiteImportUniformShapeChange: (dimension: "uniformWidthCm" | "uniformDepthCm" | "uniformHeightCm", value: number) => void;
   onSiteImportTypeProfileChange: (value: ZoneTypeProfile) => void;
@@ -34,9 +48,14 @@ export function InspectorPanel({
   siteImportState,
   kitPreview,
   fabricationSummary,
+  siteStudy,
   onSiteImportSourceChange,
   onSiteImportSpanChange,
   onSiteImportModuleChange,
+  onSiteImportDataModeChange,
+  onSiteImportTerrainModeChange,
+  onSiteImportUrbanPresetChange,
+  onSiteImportAbstractionChange,
   onSiteImportBlockStrategyChange,
   onSiteImportUniformShapeChange,
   onSiteImportTypeProfileChange,
@@ -114,6 +133,23 @@ export function InspectorPanel({
         <section className="inspector-section">
           <p className="eyebrow">Google map to blocks</p>
 
+          <div className="segmented-toggle" role="tablist" aria-label="Source mode">
+            <button
+              className={siteImportState.dataMode === "open-raster" ? "is-active" : ""}
+              onClick={() => onSiteImportDataModeChange("open-raster")}
+              type="button"
+            >
+              {ZONE_DATA_MODE_LABELS["open-raster"]}
+            </button>
+            <button
+              className={siteImportState.dataMode === "seeded" ? "is-active" : ""}
+              onClick={() => onSiteImportDataModeChange("seeded")}
+              type="button"
+            >
+              {ZONE_DATA_MODE_LABELS.seeded}
+            </button>
+          </div>
+
           <div className="form-block">
             <label className="field-label" htmlFor="site-url">
               Google Maps URL or raw lat,lng
@@ -159,6 +195,58 @@ export function InspectorPanel({
                 />
               </div>
             </div>
+          </div>
+
+          <div className="form-block">
+            <div className="table-row">
+              <span>City preset</span>
+              <strong>{ZONE_URBAN_PRESET_LABELS[siteImportState.urbanPreset]}</strong>
+            </div>
+            <div className="segmented-toggle segmented-toggle-preset" role="tablist" aria-label="Urban preset">
+              {(["compact-core", "waterfront", "hillside", "campus", "suburban"] as const).map((preset) => (
+                <button
+                  key={preset}
+                  className={siteImportState.urbanPreset === preset ? "is-active" : ""}
+                  onClick={() => onSiteImportUrbanPresetChange(preset)}
+                  type="button"
+                >
+                  {ZONE_URBAN_PRESET_LABELS[preset]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="field-stack">
+            <div className="table-row">
+              <span>Abstraction</span>
+              <strong>{siteImportState.abstractionRatio}%</strong>
+            </div>
+            <input
+              className="range-input"
+              type="range"
+              min={30}
+              max={80}
+              step={5}
+              value={siteImportState.abstractionRatio}
+              onChange={(event) => onSiteImportAbstractionChange(Number(event.target.value))}
+            />
+          </div>
+
+          <div className="segmented-toggle" role="tablist" aria-label="Terrain mode">
+            <button
+              className={siteImportState.terrainMode === "flat" ? "is-active" : ""}
+              onClick={() => onSiteImportTerrainModeChange("flat")}
+              type="button"
+            >
+              {ZONE_TERRAIN_MODE_LABELS.flat}
+            </button>
+            <button
+              className={siteImportState.terrainMode === "stepped" ? "is-active" : ""}
+              onClick={() => onSiteImportTerrainModeChange("stepped")}
+              type="button"
+            >
+              {ZONE_TERRAIN_MODE_LABELS.stepped}
+            </button>
           </div>
 
           <div className="table-block">
@@ -263,7 +351,7 @@ export function InspectorPanel({
           )}
 
           <button className="primary-button" onClick={onGenerateSiteVariant} type="button">
-            Build zone study
+            {siteImportState.dataMode === "open-raster" ? "Build real site study" : "Build seeded study"}
           </button>
 
           <div className={`status-strip is-${siteImportState.status}`}>
@@ -309,6 +397,36 @@ export function InspectorPanel({
               <MetricRow label="Construction plan inset" value="Visible beside the main 3D view" />
             </div>
           </div>
+
+          {siteStudy ? (
+            <>
+              <div className="analytic-block">
+                <div className="analytic-block-header">
+                  <p className="eyebrow">Reality extraction</p>
+                  <strong>{siteStudy.metrics.buildingClusters} clusters</strong>
+                </div>
+                <div className="metric-list">
+                  <MetricRow label="Building cells" value={siteStudy.metrics.buildingCells.toString()} />
+                  <MetricRow label="Road cells" value={siteStudy.metrics.roadCells.toString()} />
+                  <MetricRow label="Green cells" value={siteStudy.metrics.parkCells.toString()} />
+                  <MetricRow label="Water cells" value={siteStudy.metrics.waterCells.toString()} />
+                  <MetricRow label="Coverage delta" value={`${Math.round(siteStudy.metrics.coverageDelta * 100)}%`} />
+                </div>
+              </div>
+
+              <div className="analytic-block">
+                <div className="analytic-block-header">
+                  <p className="eyebrow">Fabrication checks</p>
+                  <strong>{siteStudy.checks.length}</strong>
+                </div>
+                <div className="finding-list">
+                  {(siteStudy.checks.length > 0 ? siteStudy.checks : diagnostics.slice(0, 3)).map((entry) => (
+                    <p key={entry}>{entry}</p>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : null}
         </section>
       ) : null}
 

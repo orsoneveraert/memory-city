@@ -1,18 +1,26 @@
 import type { BlockFamily, BlockLibrary, CityVariant, FabricationProfile } from "@memory-city/core-model";
+import type { SiteStudy } from "./rasterSiteImport";
 
 export type ZoneBlockStrategy = "uniform" | "generative";
 export type ZoneTypeProfile = "balanced" | "compact" | "vertical";
+export type ZoneDataMode = "open-raster" | "seeded";
+export type ZoneTerrainMode = "flat" | "stepped";
+export type ZoneUrbanPreset = "compact-core" | "waterfront" | "hillside" | "campus" | "suburban";
 
 export type ZoneImportState = {
   sourceUrl: string;
   spanMeters: number;
   moduleCm: number;
+  dataMode: ZoneDataMode;
+  terrainMode: ZoneTerrainMode;
+  urbanPreset: ZoneUrbanPreset;
+  abstractionRatio: number;
   blockStrategy: ZoneBlockStrategy;
   uniformWidthCm: number;
   uniformDepthCm: number;
   uniformHeightCm: number;
   typeProfile: ZoneTypeProfile;
-  status: "idle" | "ready" | "error";
+  status: "idle" | "loading" | "ready" | "error";
   message: string;
 };
 
@@ -48,6 +56,24 @@ export const ZONE_TYPE_PROFILE_LABELS: Record<ZoneTypeProfile, string> = {
   balanced: "Balanced set",
   compact: "Compact set",
   vertical: "Vertical set"
+};
+
+export const ZONE_DATA_MODE_LABELS: Record<ZoneDataMode, string> = {
+  "open-raster": "Open map reference",
+  seeded: "Seeded abstraction"
+};
+
+export const ZONE_TERRAIN_MODE_LABELS: Record<ZoneTerrainMode, string> = {
+  flat: "Flat base",
+  stepped: "Stepped terrain"
+};
+
+export const ZONE_URBAN_PRESET_LABELS: Record<ZoneUrbanPreset, string> = {
+  "compact-core": "Compact core",
+  waterfront: "Waterfront",
+  hillside: "Hillside",
+  campus: "Campus",
+  suburban: "Suburban"
 };
 
 const ZONE_TYPE_PROFILES: Record<ZoneTypeProfile, string[]> = {
@@ -157,7 +183,7 @@ export function summarizeBlockLibrary(blockLibrary: BlockLibrary): BlockPreviewR
     });
 }
 
-export function summarizeVariantForFabrication(variant: CityVariant): FabricationSummary {
+export function summarizeVariantForFabrication(variant: CityVariant, study: SiteStudy | null = null): FabricationSummary {
   const moduleCm = variant.blockLibrary.moduleMm / 10;
   const typeMap = new Map(variant.blockLibrary.blockTypes.map((type) => [type.id, type]));
   const typeCounts = new Map<string, number>();
@@ -199,7 +225,8 @@ export function summarizeVariantForFabrication(variant: CityVariant): Fabricatio
       0,
       ...variant.scene.blocks.map((block) => {
         const type = typeMap.get(block.typeId);
-        return (type?.height ?? 0) * moduleCm;
+        const baseLevel = study?.blockBaseLevels[block.id] ?? 0;
+        return ((type?.height ?? 0) + baseLevel) * moduleCm;
       })
     )
   );
@@ -221,7 +248,7 @@ export function summarizeVariantForFabrication(variant: CityVariant): Fabricatio
     {
       step: 1,
       label: "Base grid",
-      detail: `Prepare a ${widthCm} x ${depthCm} cm tray laid out as ${variant.footprint.width} x ${variant.footprint.depth} cells.`
+      detail: `Prepare a ${widthCm} x ${depthCm} cm tray laid out as ${variant.footprint.width} x ${variant.footprint.depth} cells${study?.metrics.terrainActive ? " with stepped base tiers." : "."}`
     },
     {
       step: 2,

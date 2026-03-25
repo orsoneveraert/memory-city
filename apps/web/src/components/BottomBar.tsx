@@ -1,5 +1,6 @@
 import type { CityVariant, EvaluationReport } from "@memory-city/core-model";
 import type { FabricationSummary } from "../zoneBuilder";
+import type { SiteStudy } from "../rasterSiteImport";
 
 type BottomBarProps = {
   variant: CityVariant;
@@ -8,6 +9,7 @@ type BottomBarProps = {
   onSelectSemanticNode: (semanticNodeId: string) => void;
   workspaceMode: "review" | "semantics" | "compose" | "evaluate" | "fabrication";
   fabricationSummary: FabricationSummary;
+  siteStudy: SiteStudy | null;
 };
 
 export function BottomBar({
@@ -16,7 +18,8 @@ export function BottomBar({
   selectedSemanticNodeId,
   onSelectSemanticNode,
   workspaceMode,
-  fabricationSummary
+  fabricationSummary,
+  siteStudy
 }: BottomBarProps) {
   if (workspaceMode === "compose") {
     return (
@@ -49,7 +52,7 @@ export function BottomBar({
 
           <section className="bottom-table-shell">
             <div className="analytic-block-header">
-              <p className="eyebrow">Construction plan</p>
+              <p className="eyebrow">Reality and construction</p>
               <strong>{fabricationSummary.widthCm} x {fabricationSummary.depthCm} cm</strong>
             </div>
             <div className="analytic-table">
@@ -65,6 +68,26 @@ export function BottomBar({
                   <span>{row.detail}</span>
                 </div>
               ))}
+              {siteStudy
+                ? [
+                    {
+                      step: "R1",
+                      label: "Source coverage",
+                      detail: `${Math.round(siteStudy.metrics.sourceCoverage * 100)}% source coverage vs ${Math.round(siteStudy.metrics.blockCoverage * 100)}% block coverage.`
+                    },
+                    {
+                      step: "R2",
+                      label: "Street and open cells",
+                      detail: `${siteStudy.metrics.roadCells} road cells, ${siteStudy.metrics.parkCells} green cells, ${siteStudy.metrics.waterCells} water cells.`
+                    }
+                  ].map((row) => (
+                    <div className="analytic-row" key={row.step}>
+                      <span>{row.step}</span>
+                      <span>{row.label}</span>
+                      <span>{row.detail}</span>
+                    </div>
+                  ))
+                : null}
             </div>
           </section>
         </div>
