@@ -33,6 +33,7 @@ function getType(variant: CityVariant, typeId: string): BlockType {
 export function PlanViewport({ variant, selectedSemanticNodeId, onSelectSemanticNode }: PlanViewportProps) {
   const width = variant.footprint.width * cellSize;
   const height = variant.footprint.depth * cellSize;
+  const moduleCm = variant.blockLibrary.moduleMm / 10;
   const routePath = variant.scene.route
     .map((step, index) => {
       const x = step.x * cellSize + cellSize / 2;
@@ -52,6 +53,19 @@ export function PlanViewport({ variant, selectedSemanticNodeId, onSelectSemantic
 
         <rect width={width} height={height} fill="#ffffff" />
         <rect width={width} height={height} fill="url(#grid)" opacity="0.8" />
+
+        <g transform="translate(10, 10)">
+          <rect width="134" height="38" fill="rgba(255,255,255,0.92)" stroke="#d3d0c7" />
+          <text x="10" y="15" fontSize="8" letterSpacing="1.3" fill="#666258">
+            PLAN GRID
+          </text>
+          <text x="10" y="28" fontSize="9" fill="#161616">
+            {`${(variant.footprint.width * moduleCm).toFixed(1)} x ${(variant.footprint.depth * moduleCm).toFixed(1)} cm`}
+          </text>
+          <text x="10" y="39" fontSize="8" fill="#666258">
+            {`${moduleCm.toFixed(1)} cm module`}
+          </text>
+        </g>
 
         {variant.scene.voids.map((voidCell) => (
           <rect

@@ -1,6 +1,5 @@
 import type { CityVariant, EvaluationReport } from "@memory-city/core-model";
-import type { FabricationSummary } from "../zoneBuilder";
-import type { SiteStudy } from "../rasterSiteImport";
+import type { FabricationSummary, JuryStudySummary } from "../zoneBuilder";
 
 type BottomBarProps = {
   variant: CityVariant;
@@ -9,7 +8,7 @@ type BottomBarProps = {
   onSelectSemanticNode: (semanticNodeId: string) => void;
   workspaceMode: "review" | "semantics" | "compose" | "evaluate" | "fabrication";
   fabricationSummary: FabricationSummary;
-  siteStudy: SiteStudy | null;
+  jurySummary: JuryStudySummary | null;
 };
 
 export function BottomBar({
@@ -19,13 +18,13 @@ export function BottomBar({
   onSelectSemanticNode,
   workspaceMode,
   fabricationSummary,
-  siteStudy
+  jurySummary
 }: BottomBarProps) {
   if (workspaceMode === "compose") {
     return (
       <footer className="bottom-bar">
         <div className="bottom-grid">
-          <section className="bottom-table-shell">
+          <section className="bottom-table-shell inventory-shell">
             <div className="analytic-block-header">
               <p className="eyebrow">Wood blocks necessary</p>
               <strong>{fabricationSummary.totalBlocks} pieces</strong>
@@ -50,9 +49,52 @@ export function BottomBar({
             </div>
           </section>
 
-          <section className="bottom-table-shell">
+          <section className="bottom-table-shell audit-shell">
             <div className="analytic-block-header">
-              <p className="eyebrow">Reality and construction</p>
+              <p className="eyebrow">Urban audit</p>
+              <strong>{jurySummary?.modelScaleLabel ?? `${fabricationSummary.widthCm} x ${fabricationSummary.depthCm} cm`}</strong>
+            </div>
+            <div className="analytic-table">
+              <div className="analytic-row analytic-row-header">
+                <span>Metric</span>
+                <span>Value</span>
+                <span>Reading</span>
+              </div>
+              <div className="analytic-row">
+                <span>Cell grain</span>
+                <span>{jurySummary ? `${jurySummary.cellMeters} m` : "-"}</span>
+                <span>Approximate site grain captured by each physical module.</span>
+              </div>
+              <div className="analytic-row">
+                <span>Built / open</span>
+                <span>{jurySummary ? `${jurySummary.sourceBuiltPct}% / ${jurySummary.sourceOpenPct}%` : "-"}</span>
+                <span>Balance between built mass and open field in the imported frame.</span>
+              </div>
+              <div className="analytic-row">
+                <span>Source match</span>
+                <span>{jurySummary ? `${jurySummary.matchedSourcePct}%` : "-"}</span>
+                <span>Built source cells still occupied by the woodblock model.</span>
+              </div>
+              <div className="analytic-row">
+                <span>Coverage delta</span>
+                <span>{jurySummary ? `${jurySummary.coverageDeltaPct}%` : "-"}</span>
+                <span>Gap between source built coverage and model coverage after abstraction.</span>
+              </div>
+              <div className="analytic-row">
+                <span>Height translation</span>
+                <span>
+                  {jurySummary
+                    ? `${jurySummary.sourceHeightBands.length} / ${jurySummary.blockHeights.length}`
+                    : "-"}
+                </span>
+                <span>Source height bands translated into a reduced set of block tiers.</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="bottom-table-shell construction-shell">
+            <div className="analytic-block-header">
+              <p className="eyebrow">Construction plan</p>
               <strong>{fabricationSummary.widthCm} x {fabricationSummary.depthCm} cm</strong>
             </div>
             <div className="analytic-table">
@@ -68,26 +110,6 @@ export function BottomBar({
                   <span>{row.detail}</span>
                 </div>
               ))}
-              {siteStudy
-                ? [
-                    {
-                      step: "R1",
-                      label: "Source coverage",
-                      detail: `${Math.round(siteStudy.metrics.sourceCoverage * 100)}% source coverage vs ${Math.round(siteStudy.metrics.blockCoverage * 100)}% block coverage.`
-                    },
-                    {
-                      step: "R2",
-                      label: "Street and open cells",
-                      detail: `${siteStudy.metrics.roadCells} road cells, ${siteStudy.metrics.parkCells} green cells, ${siteStudy.metrics.waterCells} water cells.`
-                    }
-                  ].map((row) => (
-                    <div className="analytic-row" key={row.step}>
-                      <span>{row.step}</span>
-                      <span>{row.label}</span>
-                      <span>{row.detail}</span>
-                    </div>
-                  ))
-                : null}
             </div>
           </section>
         </div>

@@ -14,6 +14,7 @@ import {
   buildZoneBlockLibrary,
   buildZoneFabricationProfile,
   summarizeBlockLibrary,
+  summarizeStudyForJury,
   summarizeVariantForFabrication,
   type ZoneImportState
 } from "./zoneBuilder";
@@ -57,6 +58,7 @@ export default function App() {
   const kitPreview = summarizeBlockLibrary(previewBlockLibrary);
   const selectedStudy = siteStudies.get(selectedVariantId) ?? null;
   const fabricationSummary = summarizeVariantForFabrication(selectedVariant, selectedStudy);
+  const jurySummary = summarizeStudyForJury(selectedVariant, selectedStudy);
 
   function handleSelectVariant(variantId: string) {
     setSelectedVariantId(variantId);
@@ -70,7 +72,7 @@ export default function App() {
       status: "loading",
       message:
         current.dataMode === "open-raster"
-          ? "Sampling open map tiles and building a reference study."
+          ? "Sampling open map raster tiles and building a map-derived study."
           : "Building a seeded abstraction from the zone."
     }));
 
@@ -145,7 +147,7 @@ export default function App() {
         renderMode={renderMode}
         onRenderModeChange={setRenderMode}
         fabricationSummary={fabricationSummary}
-        siteStudy={selectedStudy}
+        jurySummary={jurySummary}
       />
 
       <div className={`workspace-grid ${isComposeMode ? "is-compose-mode" : ""}`}>
@@ -159,16 +161,17 @@ export default function App() {
           workspaceMode={workspaceMode}
           fabricationSummary={fabricationSummary}
           siteStudy={selectedStudy}
+          jurySummary={jurySummary}
         />
 
         <main className={`main-stage ${isComposeMode ? "is-compose-mode" : ""}`}>
           <header className="stage-header">
             <div className="stage-title-block">
-              <p className="eyebrow">{isComposeMode ? "Google zone" : "Viewer"}</p>
-              <h2>{isComposeMode ? "Wood block site study" : selectedVariant.name}</h2>
+              <p className="eyebrow">{isComposeMode ? "Urban study" : "Viewer"}</p>
+              <h2>{isComposeMode ? "Map-derived urban frame to wood maquette" : selectedVariant.name}</h2>
               <p className="panel-note">
                 {isComposeMode
-                  ? `${selectedVariant.name} · ${siteImportState.spanMeters} m site span · ${fabricationSummary.strategyLabel}`
+                  ? `${selectedVariant.name} · ${siteImportState.spanMeters} m frame · ${siteImportState.urbanPreset.replace("-", " ")} preset · ${siteImportState.terrainMode.replace("-", " ")} · ${siteImportState.abstractionRatio}% abstraction`
                   : selectedVariant.semanticGraph.title}
               </p>
             </div>
@@ -195,24 +198,40 @@ export default function App() {
 
               <div className="stage-metrics">
                 <div className="stage-metric">
-                  <span>{isComposeMode ? "System" : "Rule set"}</span>
-                  <strong>{isComposeMode ? fabricationSummary.strategyLabel : selectedVariant.ruleSet.name}</strong>
-                </div>
-                <div className="stage-metric">
-                  <span>{isComposeMode ? "Maquette" : "Blocks"}</span>
+                  <span>{isComposeMode ? "Reference" : "Rule set"}</span>
                   <strong>
                     {isComposeMode
-                      ? `${fabricationSummary.widthCm} x ${fabricationSummary.depthCm} x ${fabricationSummary.heightCm} cm`
+                      ? siteImportState.dataMode === "open-raster"
+                        ? "Open map raster"
+                        : "Seeded study"
+                      : selectedVariant.ruleSet.name}
+                  </strong>
+                </div>
+                <div className="stage-metric">
+                  <span>{isComposeMode ? "Scale" : "Blocks"}</span>
+                  <strong>
+                    {isComposeMode
+                      ? jurySummary?.modelScaleLabel ?? `${fabricationSummary.moduleCm} cm module`
                       : selectedVariant.scene.blocks.length}
                   </strong>
                 </div>
                 <div className="stage-metric">
-                  <span>{isComposeMode ? "Pieces" : "Memory"}</span>
-                  <strong>{isComposeMode ? fabricationSummary.totalBlocks : Math.round(selectedReport.profile.memory * 100)}</strong>
+                  <span>{isComposeMode ? "Source" : "Memory"}</span>
+                  <strong>
+                    {isComposeMode
+                      ? jurySummary
+                        ? `${jurySummary.sourceBuiltPct}% built / ${jurySummary.sourceOpenPct}% open`
+                        : `${fabricationSummary.widthCm} x ${fabricationSummary.depthCm} x ${fabricationSummary.heightCm} cm`
+                      : Math.round(selectedReport.profile.memory * 100)}
+                  </strong>
                 </div>
                 <div className="stage-metric">
-                  <span>{isComposeMode ? "Module" : "Path"}</span>
-                  <strong>{isComposeMode ? `${fabricationSummary.moduleCm} cm` : selectedReport.metrics.routeLength}</strong>
+                  <span>{isComposeMode ? "Object" : "Path"}</span>
+                  <strong>
+                    {isComposeMode
+                      ? `${fabricationSummary.totalBlocks} pcs · ${fabricationSummary.widthCm} x ${fabricationSummary.depthCm} cm`
+                      : selectedReport.metrics.routeLength}
+                  </strong>
                 </div>
               </div>
             </div>
@@ -295,6 +314,7 @@ export default function App() {
           kitPreview={kitPreview}
           fabricationSummary={fabricationSummary}
           siteStudy={selectedStudy}
+          jurySummary={jurySummary}
           onSiteImportSourceChange={(value) =>
             setSiteImportState((current) => ({
               ...current,
@@ -366,7 +386,7 @@ export default function App() {
         onSelectSemanticNode={setSelectedSemanticNodeId}
         workspaceMode={workspaceMode}
         fabricationSummary={fabricationSummary}
-        siteStudy={selectedStudy}
+        jurySummary={jurySummary}
       />
     </div>
   );

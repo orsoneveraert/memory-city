@@ -52,6 +52,30 @@ export type FabricationSummary = {
   constructionSteps: Array<{ step: number; label: string; detail: string }>;
 };
 
+export type JuryStudySummary = {
+  sourceBuiltPct: number;
+  sourceOpenPct: number;
+  sourceRoadPct: number;
+  sourceGreenBluePct: number;
+  blockCoveragePct: number;
+  coverageDeltaPct: number;
+  matchedSourcePct: number;
+  matchedSourceCells: number;
+  lostSourceCells: number;
+  addedModelCells: number;
+  clusterCount: number;
+  averageClusterCells: number;
+  abstractionCompression: number;
+  terrainCellCount: number;
+  terrainTierCount: number;
+  cellMeters: number;
+  tileZoom: number;
+  modelScaleLabel: string;
+  sourceHeightBands: Array<{ label: string; count: number }>;
+  blockHeights: Array<{ label: string; count: number }>;
+  scaleLabel: string;
+};
+
 export const ZONE_TYPE_PROFILE_LABELS: Record<ZoneTypeProfile, string> = {
   balanced: "Balanced set",
   compact: "Compact set",
@@ -106,6 +130,37 @@ function cmToModules(valueCm: number, moduleCm: number): number {
 
 function strategyLabelFromLibrary(blockLibrary: BlockLibrary): string {
   return blockLibrary.blockTypes.length === 1 ? "Single block size" : "Generative type set";
+}
+
+function percent(value: number): number {
+  return Math.round(value * 100);
+}
+
+function coverageKey(x: number, y: number): string {
+  return `${x}:${y}`;
+}
+
+export function buildVariantCoverageCells(variant: CityVariant): Set<string> {
+  const typeMap = new Map(variant.blockLibrary.blockTypes.map((type) => [type.id, type]));
+  const cells = new Set<string>();
+
+  variant.scene.blocks.forEach((block) => {
+    const type = typeMap.get(block.typeId);
+    if (!type) {
+      return;
+    }
+
+    const width = block.rotation === 90 ? type.depth : type.width;
+    const depth = block.rotation === 90 ? type.width : type.depth;
+
+    for (let dx = 0; dx < width; dx += 1) {
+      for (let dy = 0; dy < depth; dy += 1) {
+        cells.add(coverageKey(block.x + dx, block.y + dy));
+      }
+    }
+  });
+
+  return cells;
 }
 
 export function buildZoneBlockLibrary(state: ZoneImportState, sourceLibrary: BlockLibrary): BlockLibrary {
@@ -247,24 +302,28 @@ export function summarizeVariantForFabrication(variant: CityVariant, study: Site
   const constructionSteps = [
     {
       step: 1,
-      label: "Base grid",
+      label: "Tray and grid",
       detail: `Prepare a ${widthCm} x ${depthCm} cm tray laid out as ${variant.footprint.width} x ${variant.footprint.depth} cells${study?.metrics.terrainActive ? " with stepped base tiers." : "."}`
     },
     {
       step: 2,
-      label: "Low pieces",
-      detail: lowCount > 0 ? `Place ${lowCount} low pieces to establish the base massing.` : "No low pieces in this study."
+      label: study?.metrics.terrainActive ? "Terrain base" : "Primary masses",
+      detail: study?.metrics.terrainActive
+        ? `Build the stepped base first using ${study.terrainCells.length} terrain cells before placing the first wood masses.`
+        : lowCount > 0
+          ? `Place ${lowCount} low pieces to establish the primary urban massing.`
+          : "No low pieces in this study."
     },
     {
       step: 3,
-      label: "Raised pieces",
+      label: "Secondary masses",
       detail:
-        midCount > 0 ? `Add ${midCount} medium-height pieces to shape terraces and thresholds.` : "No raised terrace layer in this study."
+        midCount > 0 ? `Add ${midCount} medium-height pieces to articulate terraces, street walls, and secondary relief.` : "No medium-height massing in this study."
     },
     {
       step: 4,
-      label: "Tall markers",
-      detail: tallCount > 0 ? `Finish with ${tallCount} tall pieces to complete the skyline.` : "No tall markers in this study."
+      label: "Markers and skyline",
+      detail: tallCount > 0 ? `Finish with ${tallCount} tall pieces to set landmarks and complete the skyline.` : "No tall markers in this study."
     }
   ];
 
@@ -280,5 +339,99 @@ export function summarizeVariantForFabrication(variant: CityVariant, study: Site
     typeRows,
     familyRows,
     constructionSteps
+  };
+}
+
+export function summarizeStudyForJury(variant: CityVariant, study: SiteStudy | null): JuryStudySummary | null {
+  if (!study) {
+    return null;
+  }
+
+  const totalCells = Math.max(1, study.footprint.width * study.footprint.depth);
+  const moduleCm = variant.blockLibrary.moduleMm / 10;
+  const sourceBuiltPct = percent(study.metrics.buildingCells / totalCells);
+  const sourceOpenPct = percent(1 - study.metrics.buildingCells / totalCells);
+  const sourceRoadPct = percent(study.metrics.roadCells / totalCells);
+  const sourceGreenBluePct = percent((study.metrics.parkCells + study.metrics.waterCells) / totalCells);
+  const blockCoveragePct = percent(study.metrics.blockCoverage);
+  const coverageDeltaPct = percent(study.metrics.coverageDelta);
+  const averageClusterCells =
+    study.metrics.buildingClusters > 0 ? Math.round((study.metrics.buildingCells / study.metrics.buildingClusters) * 10) / 10 : 0;
+  const abstractionCompression =
+    variant.scene.blocks.length > 0 ? Math.round((study.metrics.buildingCells / variant.scene.blocks.length) * 10) / 10 : 0;
+  const sourceBuiltCells = new Set(
+    study.referenceCells.filter((cell) => cell.kind === "building").map((cell) => coverageKey(cell.x, cell.y))
+  );
+  const blockCoverageCells = buildVariantCoverageCells(variant);
+  let matchedSourceCells = 0;
+  let lostSourceCells = 0;
+
+  sourceBuiltCells.forEach((key) => {
+    if (blockCoverageCells.has(key)) {
+      matchedSourceCells += 1;
+    } else {
+      lostSourceCells += 1;
+    }
+  });
+
+  let addedModelCells = 0;
+  blockCoverageCells.forEach((key) => {
+    if (!sourceBuiltCells.has(key)) {
+      addedModelCells += 1;
+    }
+  });
+  const matchedSourcePct = sourceBuiltCells.size > 0 ? percent(matchedSourceCells / sourceBuiltCells.size) : 0;
+
+  const sourceHeightCounts = new Map<number, number>();
+  study.referenceCells.forEach((cell) => {
+    if (cell.kind !== "building") {
+      return;
+    }
+    const heightBand = cell.heightBand ?? 1;
+    sourceHeightCounts.set(heightBand, (sourceHeightCounts.get(heightBand) ?? 0) + 1);
+  });
+
+  const blockTypeMap = new Map(variant.blockLibrary.blockTypes.map((type) => [type.id, type]));
+  const blockHeightCounts = new Map<number, number>();
+  variant.scene.blocks.forEach((block) => {
+    const type = blockTypeMap.get(block.typeId);
+    if (!type) {
+      return;
+    }
+    blockHeightCounts.set(type.height, (blockHeightCounts.get(type.height) ?? 0) + 1);
+  });
+
+  return {
+    sourceBuiltPct,
+    sourceOpenPct,
+    sourceRoadPct,
+    sourceGreenBluePct,
+    blockCoveragePct,
+    coverageDeltaPct,
+    matchedSourcePct,
+    matchedSourceCells,
+    lostSourceCells,
+    addedModelCells,
+    clusterCount: study.metrics.buildingClusters,
+    averageClusterCells,
+    abstractionCompression,
+    terrainCellCount: study.terrainCells.length,
+    terrainTierCount: Math.max(0, ...study.terrainCells.map((cell) => cell.tier)),
+    cellMeters: Math.round(study.cellMeters * 10) / 10,
+    tileZoom: study.tileZoom,
+    modelScaleLabel: `1:${Math.max(1, Math.round((study.cellMeters * 100) / Math.max(moduleCm, 0.1)))}`,
+    sourceHeightBands: Array.from(sourceHeightCounts.entries())
+      .sort((left, right) => left[0] - right[0])
+      .map(([band, count]) => ({
+        label: `Band ${band}`,
+        count
+      })),
+    blockHeights: Array.from(blockHeightCounts.entries())
+      .sort((left, right) => left[0] - right[0])
+      .map(([height, count]) => ({
+        label: `${height}u`,
+        count
+      })),
+    scaleLabel: study.referenceLabel
   };
 }

@@ -129,13 +129,13 @@ export function SceneViewport({
 
   return (
     <div className="viewport scene-viewport">
-      <Canvas camera={{ position: [8, 9, 12], fov: 42 }} shadows>
+      <Canvas camera={{ position: [11, 11, 11], fov: 30 }} shadows>
         <color attach="background" args={["#ffffff"]} />
-        <ambientLight intensity={0.9} />
+        <ambientLight intensity={0.82} />
         <directionalLight
           castShadow
-          intensity={1.1}
-          position={[9, 14, 7]}
+          intensity={1.05}
+          position={[12, 18, 10]}
           shadow-mapSize-width={1024}
           shadow-mapSize-height={1024}
         />
@@ -217,7 +217,7 @@ export function SceneViewport({
           );
         })}
 
-        <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2.05} />
+        <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2.12} minPolarAngle={Math.PI / 5} target={[0, 0.8, 0]} />
       </Canvas>
     </div>
   );

@@ -1,6 +1,5 @@
 import type { CityVariant, EvaluationReport } from "@memory-city/core-model";
-import type { FabricationSummary } from "../zoneBuilder";
-import type { SiteStudy } from "../rasterSiteImport";
+import type { FabricationSummary, JuryStudySummary } from "../zoneBuilder";
 
 type TopBarProps = {
   variant: CityVariant;
@@ -12,7 +11,7 @@ type TopBarProps = {
   renderMode: "analytic" | "wood";
   onRenderModeChange: (mode: "analytic" | "wood") => void;
   fabricationSummary: FabricationSummary;
-  siteStudy?: SiteStudy | null;
+  jurySummary?: JuryStudySummary | null;
 };
 
 export function TopBar({
@@ -23,15 +22,15 @@ export function TopBar({
   renderMode,
   onRenderModeChange,
   fabricationSummary,
-  siteStudy = null
+  jurySummary = null
 }: TopBarProps) {
   const isComposeMode = workspaceMode === "compose";
 
   return (
     <header className="top-bar">
       <div>
-        <p className="eyebrow">{isComposeMode ? "Google zone / wood kit" : "Memory City"}</p>
-        <h1>{isComposeMode ? "Site-to-block editor" : "Mnemonic city-object editor"}</h1>
+        <p className="eyebrow">{isComposeMode ? "Urban woodblock study" : "Memory City"}</p>
+        <h1>{isComposeMode ? "Map-derived site abstraction editor" : "Mnemonic city-object editor"}</h1>
         <div className="workspace-mode-toggle" role="tablist" aria-label="Workspace mode">
           {(["review", "semantics", "compose", "evaluate", "fabrication"] as const).map((mode) => (
             <button
@@ -48,32 +47,31 @@ export function TopBar({
 
       <div className="top-bar-meta">
         <div className="stat-pill">
-          <span>Seed</span>
-          <strong>{variant.seed}</strong>
+          <span>{isComposeMode ? "Frame" : "Seed"}</span>
+          <strong>{isComposeMode ? jurySummary?.scaleLabel ?? `${fabricationSummary.moduleCm} cm module` : variant.seed}</strong>
+        </div>
+        <div className="stat-pill">
+          <span>{isComposeMode ? "Scale" : "Blocks"}</span>
+          <strong>{isComposeMode ? jurySummary?.modelScaleLabel ?? `${fabricationSummary.moduleCm} cm module` : variant.scene.blocks.length}</strong>
         </div>
         <div className="stat-pill">
           <span>{isComposeMode ? "Pieces" : "Blocks"}</span>
           <strong>{isComposeMode ? fabricationSummary.totalBlocks : variant.scene.blocks.length}</strong>
         </div>
         <div className="stat-pill">
-          <span>{isComposeMode ? "Maquette" : "Path"}</span>
+          <span>{isComposeMode ? "Match" : "Path"}</span>
           <strong>
             {isComposeMode
-              ? `${fabricationSummary.widthCm} x ${fabricationSummary.depthCm} cm`
+              ? jurySummary
+                ? `${jurySummary.matchedSourcePct}%`
+                : `${fabricationSummary.widthCm} x ${fabricationSummary.depthCm} cm`
               : report.metrics.routeLength}
           </strong>
         </div>
         <div className="stat-pill">
-          <span>{isComposeMode ? "Module" : "Memory"}</span>
-          <strong>{isComposeMode ? `${fabricationSummary.moduleCm} cm` : Math.round(report.profile.memory * 100)}</strong>
+          <span>{isComposeMode ? "Relief" : "Memory"}</span>
+          <strong>{isComposeMode ? `${jurySummary?.terrainTierCount ?? 0} tiers` : Math.round(report.profile.memory * 100)}</strong>
         </div>
-        {isComposeMode && siteStudy ? (
-          <div className="stat-pill">
-            <span>Source</span>
-            <strong>{siteStudy.metrics.buildingClusters} clusters</strong>
-          </div>
-        ) : null}
-
         <div className="render-toggle" role="tablist" aria-label="Render mode">
           <button
             className={renderMode === "analytic" ? "is-active" : ""}

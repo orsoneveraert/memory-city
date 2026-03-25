@@ -2,6 +2,7 @@ import type { CityVariant, EvaluationReport } from "@memory-city/core-model";
 import type {
   BlockPreviewRow,
   FabricationSummary,
+  JuryStudySummary,
   ZoneBlockStrategy,
   ZoneDataMode,
   ZoneImportState,
@@ -11,6 +12,7 @@ import type {
 import {
   ZONE_DATA_MODE_LABELS,
   ZONE_TERRAIN_MODE_LABELS,
+  ZONE_TYPE_PROFILE_LABELS,
   ZONE_URBAN_PRESET_LABELS,
   type ZoneUrbanPreset
 } from "../zoneBuilder";
@@ -26,6 +28,7 @@ type InspectorPanelProps = {
   kitPreview: BlockPreviewRow[];
   fabricationSummary: FabricationSummary;
   siteStudy: SiteStudy | null;
+  jurySummary: JuryStudySummary | null;
   onSiteImportSourceChange: (value: string) => void;
   onSiteImportSpanChange: (value: number) => void;
   onSiteImportModuleChange: (value: number) => void;
@@ -49,6 +52,7 @@ export function InspectorPanel({
   kitPreview,
   fabricationSummary,
   siteStudy,
+  jurySummary,
   onSiteImportSourceChange,
   onSiteImportSpanChange,
   onSiteImportModuleChange,
@@ -131,7 +135,7 @@ export function InspectorPanel({
 
       {workspaceMode === "compose" ? (
         <section className="inspector-section">
-          <p className="eyebrow">Google map to blocks</p>
+          <p className="eyebrow">Map frame to maquette</p>
 
           <div className="segmented-toggle" role="tablist" aria-label="Source mode">
             <button
@@ -148,6 +152,45 @@ export function InspectorPanel({
             >
               {ZONE_DATA_MODE_LABELS.seeded}
             </button>
+          </div>
+
+          <div className="analytic-block">
+            <div className="analytic-block-header">
+              <p className="eyebrow">Method</p>
+              <strong>{siteImportState.dataMode === "open-raster" ? "Map-derived" : "Seeded"}</strong>
+            </div>
+            <div className="analytic-table">
+              <div className="analytic-row analytic-row-header">
+                <span>Step</span>
+                <span>Value</span>
+                <span>Reading</span>
+              </div>
+              <div className="analytic-row">
+                <span>1. Source frame</span>
+                <span>{siteImportState.spanMeters} m</span>
+                <span>{siteImportState.dataMode === "open-raster" ? "Open map raster reference centered on the imported Google frame." : "Seeded geometric abstraction around the imported frame."}</span>
+              </div>
+              <div className="analytic-row">
+                <span>2. Urban preset</span>
+                <span>{ZONE_URBAN_PRESET_LABELS[siteImportState.urbanPreset]}</span>
+                <span>Controls how built clusters, voids, and edges are simplified into a woodblock field.</span>
+              </div>
+              <div className="analytic-row">
+                <span>3. Relief</span>
+                <span>{ZONE_TERRAIN_MODE_LABELS[siteImportState.terrainMode]}</span>
+                <span>{siteStudy ? `Reference zoom z${siteStudy.tileZoom} · ${Math.round(siteStudy.cellMeters)} m/cell.` : "Flat tray or stepped terrain base before blocks are placed."}</span>
+              </div>
+              <div className="analytic-row">
+                <span>4. Abstraction</span>
+                <span>{siteImportState.abstractionRatio}%</span>
+                <span>Balances literal site grain against a reduced block grammar for fabrication.</span>
+              </div>
+              <div className="analytic-row">
+                <span>5. Block system</span>
+                <span>{siteImportState.blockStrategy === "uniform" ? "Same size" : "Generative set"}</span>
+                <span>{siteImportState.blockStrategy === "uniform" ? "Single block dimension repeated across the field." : `${ZONE_TYPE_PROFILE_LABELS[siteImportState.typeProfile]} block family with shared module.`}</span>
+              </div>
+            </div>
           </div>
 
           <div className="form-block">
@@ -351,7 +394,7 @@ export function InspectorPanel({
           )}
 
           <button className="primary-button" onClick={onGenerateSiteVariant} type="button">
-            {siteImportState.dataMode === "open-raster" ? "Build real site study" : "Build seeded study"}
+            {siteImportState.dataMode === "open-raster" ? "Build map-derived study" : "Build seeded study"}
           </button>
 
           <div className={`status-strip is-${siteImportState.status}`}>
@@ -402,7 +445,22 @@ export function InspectorPanel({
             <>
               <div className="analytic-block">
                 <div className="analytic-block-header">
-                  <p className="eyebrow">Reality extraction</p>
+                  <p className="eyebrow">Urban reading</p>
+                  <strong>{jurySummary?.scaleLabel ?? siteStudy.referenceLabel}</strong>
+                </div>
+                <div className="metric-list">
+                  <MetricRow label="Source built fabric" value={`${jurySummary?.sourceBuiltPct ?? 0}%`} />
+                  <MetricRow label="Road structure" value={`${jurySummary?.sourceRoadPct ?? 0}%`} />
+                  <MetricRow label="Green and water" value={`${jurySummary?.sourceGreenBluePct ?? 0}%`} />
+                  <MetricRow label="Maquette coverage" value={`${jurySummary?.blockCoveragePct ?? 0}%`} />
+                  <MetricRow label="Source match" value={`${jurySummary?.matchedSourcePct ?? 0}%`} />
+                  <MetricRow label="Source/model delta" value={`${jurySummary?.coverageDeltaPct ?? 0}%`} />
+                </div>
+              </div>
+
+              <div className="analytic-block">
+                <div className="analytic-block-header">
+                  <p className="eyebrow">Reference extraction</p>
                   <strong>{siteStudy.metrics.buildingClusters} clusters</strong>
                 </div>
                 <div className="metric-list">
@@ -410,7 +468,80 @@ export function InspectorPanel({
                   <MetricRow label="Road cells" value={siteStudy.metrics.roadCells.toString()} />
                   <MetricRow label="Green cells" value={siteStudy.metrics.parkCells.toString()} />
                   <MetricRow label="Water cells" value={siteStudy.metrics.waterCells.toString()} />
-                  <MetricRow label="Coverage delta" value={`${Math.round(siteStudy.metrics.coverageDelta * 100)}%`} />
+                  <MetricRow label="Matched source cells" value={`${jurySummary?.matchedSourceCells ?? 0}`} />
+                  <MetricRow label="Added model cells" value={`${jurySummary?.addedModelCells ?? 0}`} />
+                  <MetricRow label="Average grain" value={`${jurySummary?.averageClusterCells ?? 0} cells / cluster`} />
+                </div>
+              </div>
+
+              <div className="analytic-block">
+                <div className="analytic-block-header">
+                  <p className="eyebrow">Height translation</p>
+                  <strong>{jurySummary?.modelScaleLabel ?? "-"}</strong>
+                </div>
+                <div className="analytic-table">
+                  <div className="analytic-row analytic-row-header">
+                    <span>Source band</span>
+                    <span>Cells</span>
+                    <span>Block tier</span>
+                  </div>
+                  {jurySummary
+                    ? Array.from({ length: Math.max(jurySummary.sourceHeightBands.length, jurySummary.blockHeights.length) }, (_, index) => {
+                        const sourceBand = jurySummary.sourceHeightBands[index];
+                        const blockBand = jurySummary.blockHeights[index];
+                        return (
+                          <div className="analytic-row" key={`height-${index}`}>
+                            <span>{sourceBand?.label ?? "—"}</span>
+                            <span>{sourceBand?.count ?? 0}</span>
+                            <span>{blockBand ? `${blockBand.label} · ${blockBand.count} pcs` : "—"}</span>
+                          </div>
+                        );
+                      })
+                    : null}
+                </div>
+              </div>
+
+              <div className="analytic-block">
+                <div className="analytic-block-header">
+                  <p className="eyebrow">Reference legend</p>
+                  <strong>Source / model</strong>
+                </div>
+                <div className="analytic-table">
+                  <div className="analytic-row analytic-row-header">
+                    <span>Layer</span>
+                    <span>Code</span>
+                    <span>Reading</span>
+                  </div>
+                  <div className="analytic-row">
+                    <span>Built fabric</span>
+                    <span>Warm solids</span>
+                    <span>Imported built surface and height bands.</span>
+                  </div>
+                  <div className="analytic-row">
+                    <span>Road network</span>
+                    <span>Pale corridors</span>
+                    <span>Circulation structure preserved as void.</span>
+                  </div>
+                  <div className="analytic-row">
+                    <span>Green and water</span>
+                    <span>Green / blue</span>
+                    <span>Landscape and edge conditions kept as open field.</span>
+                  </div>
+                  <div className="analytic-row">
+                    <span>Terrain tiers</span>
+                    <span>Contour wash</span>
+                    <span>Stepped base relief inferred from topographic raster sampling.</span>
+                  </div>
+                  <div className="analytic-row">
+                    <span>Block overlay</span>
+                    <span>Dashed outline</span>
+                    <span>Woodblock abstraction positioned against the source field.</span>
+                  </div>
+                  <div className="analytic-row">
+                    <span>Loss / gain</span>
+                    <span>Red / ochre</span>
+                    <span>Highlights built fabric omitted by the model and mass added beyond the source.</span>
+                  </div>
                 </div>
               </div>
 
