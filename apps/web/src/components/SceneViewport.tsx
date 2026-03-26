@@ -1,8 +1,9 @@
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import type { BlockType, CityVariant } from "@memory-city/core-model";
 import type { SiteStudy } from "../rasterSiteImport";
+import type { ZoneReferenceOverlayMode } from "../zoneBuilder";
 
 type SceneViewportProps = {
   variant: CityVariant;
@@ -10,6 +11,8 @@ type SceneViewportProps = {
   selectedSemanticNodeId: string | null;
   onSelectSemanticNode: (semanticNodeId: string) => void;
   study?: SiteStudy | null;
+  referenceOverlayMode: ZoneReferenceOverlayMode;
+  referenceOverlayOpacity: number;
 };
 
 const familyColors: Record<BlockType["family"], string> = {
@@ -117,15 +120,55 @@ function BlockMesh({
   );
 }
 
+function ReferenceOverlayPlane({
+  variant,
+  textureUrl,
+  opacity
+}: {
+  variant: CityVariant;
+  textureUrl: string;
+  opacity: number;
+}) {
+  const texture = useTexture(textureUrl);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+
+  return (
+    <mesh rotation-x={-Math.PI / 2} position={[0, -0.109, 0]} receiveShadow>
+      <planeGeometry args={[variant.footprint.width, variant.footprint.depth]} />
+      <meshStandardMaterial
+        color="#ffffff"
+        map={texture}
+        transparent
+        opacity={opacity}
+        roughness={1}
+        metalness={0}
+        polygonOffset
+        polygonOffsetFactor={-1}
+        polygonOffsetUnits={-1}
+      />
+    </mesh>
+  );
+}
+
 export function SceneViewport({
   variant,
   renderMode,
   selectedSemanticNodeId,
   onSelectSemanticNode,
-  study = null
+  study = null,
+  referenceOverlayMode,
+  referenceOverlayOpacity
 }: SceneViewportProps) {
   const trayTexture = renderMode === "wood" ? createWoodTexture("tray-base") : null;
   const terrainTiles = study?.terrainCells ?? [];
+  const overlayTextureUrl =
+    study && referenceOverlayMode !== "off"
+      ? referenceOverlayMode === "source-map"
+        ? study.sourceRasterDataUrl
+        : study.analyticRasterDataUrl
+      : null;
 
   return (
     <div className="viewport scene-viewport">
@@ -154,6 +197,14 @@ export function SceneViewport({
           <planeGeometry args={[variant.footprint.width + 1.9, variant.footprint.depth + 1.9]} />
           <meshStandardMaterial color={renderMode === "wood" ? "#d8b58a" : "#ffffff"} map={trayTexture} roughness={1} />
         </mesh>
+
+        {overlayTextureUrl ? (
+          <ReferenceOverlayPlane
+            variant={variant}
+            textureUrl={overlayTextureUrl}
+            opacity={Math.max(0, Math.min(referenceOverlayOpacity, 100)) / 100}
+          />
+        ) : null}
 
         {terrainTiles.map((cell) => (
           <mesh

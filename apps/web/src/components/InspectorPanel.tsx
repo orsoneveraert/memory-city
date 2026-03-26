@@ -6,17 +6,20 @@ import type {
   ZoneBlockStrategy,
   ZoneDataMode,
   ZoneImportState,
+  ZoneReferenceOverlayMode,
   ZoneTerrainMode,
   ZoneTypeProfile
 } from "../zoneBuilder";
 import {
   ZONE_DATA_MODE_LABELS,
+  ZONE_REFERENCE_OVERLAY_LABELS,
   ZONE_TERRAIN_MODE_LABELS,
   ZONE_TYPE_PROFILE_LABELS,
   ZONE_URBAN_PRESET_LABELS,
   type ZoneUrbanPreset
 } from "../zoneBuilder";
 import type { SiteStudy } from "../rasterSiteImport";
+import { BlockShapeDiagram } from "./BlockShapeDiagram";
 
 type InspectorPanelProps = {
   variant: CityVariant;
@@ -36,6 +39,8 @@ type InspectorPanelProps = {
   onSiteImportTerrainModeChange: (value: ZoneTerrainMode) => void;
   onSiteImportUrbanPresetChange: (value: ZoneUrbanPreset) => void;
   onSiteImportAbstractionChange: (value: number) => void;
+  onSiteImportReferenceOverlayModeChange: (value: ZoneReferenceOverlayMode) => void;
+  onSiteImportReferenceOverlayOpacityChange: (value: number) => void;
   onSiteImportBlockStrategyChange: (value: ZoneBlockStrategy) => void;
   onSiteImportUniformShapeChange: (dimension: "uniformWidthCm" | "uniformDepthCm" | "uniformHeightCm", value: number) => void;
   onSiteImportTypeProfileChange: (value: ZoneTypeProfile) => void;
@@ -60,6 +65,8 @@ export function InspectorPanel({
   onSiteImportTerrainModeChange,
   onSiteImportUrbanPresetChange,
   onSiteImportAbstractionChange,
+  onSiteImportReferenceOverlayModeChange,
+  onSiteImportReferenceOverlayOpacityChange,
   onSiteImportBlockStrategyChange,
   onSiteImportUniformShapeChange,
   onSiteImportTypeProfileChange,
@@ -292,6 +299,43 @@ export function InspectorPanel({
             </button>
           </div>
 
+          <div className="analytic-block">
+            <div className="analytic-block-header">
+              <p className="eyebrow">3D reference overlay</p>
+              <strong>{ZONE_REFERENCE_OVERLAY_LABELS[siteImportState.referenceOverlayMode]}</strong>
+            </div>
+            <div className="segmented-toggle segmented-toggle-tight" role="tablist" aria-label="Reference overlay">
+              {(["off", "source-map", "analytic-field"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  className={siteImportState.referenceOverlayMode === mode ? "is-active" : ""}
+                  onClick={() => onSiteImportReferenceOverlayModeChange(mode)}
+                  type="button"
+                >
+                  {ZONE_REFERENCE_OVERLAY_LABELS[mode]}
+                </button>
+              ))}
+            </div>
+            <div className="field-stack">
+              <div className="table-row">
+                <span>Overlay opacity</span>
+                <strong>{siteImportState.referenceOverlayOpacity}%</strong>
+              </div>
+              <input
+                className="range-input"
+                type="range"
+                min={0}
+                max={85}
+                step={5}
+                value={siteImportState.referenceOverlayOpacity}
+                onChange={(event) => onSiteImportReferenceOverlayOpacityChange(Number(event.target.value))}
+              />
+            </div>
+            <p className="variant-card-note">
+              The selected reference field is projected onto the tray in the main 3D view, so it rotates with the same camera as the wood blocks.
+            </p>
+          </div>
+
           <div className="table-block">
             <div className="table-row">
               <span>Block system</span>
@@ -392,6 +436,18 @@ export function InspectorPanel({
               </div>
             </div>
           )}
+
+          <div className="analytic-block">
+            <div className="analytic-block-header">
+              <p className="eyebrow">Block diagram</p>
+              <strong>{siteImportState.blockStrategy === "uniform" ? "Live single unit" : "Live family preview"}</strong>
+            </div>
+            <BlockShapeDiagram
+              rows={kitPreview}
+              moduleCm={siteImportState.moduleCm}
+              strategy={siteImportState.blockStrategy}
+            />
+          </div>
 
           <button className="primary-button" onClick={onGenerateSiteVariant} type="button">
             {siteImportState.dataMode === "open-raster" ? "Build map-derived study" : "Build seeded study"}

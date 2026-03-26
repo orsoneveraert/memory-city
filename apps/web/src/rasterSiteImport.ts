@@ -52,6 +52,8 @@ export type SiteStudy = {
   footprint: { width: number; depth: number };
   cellMeters: number;
   tileZoom: number;
+  sourceRasterDataUrl: string;
+  analyticRasterDataUrl: string;
   referenceCells: SiteStudyCell[];
   terrainCells: TerrainCell[];
   blockBaseLevels: Record<string, number>;
@@ -102,6 +104,18 @@ type TileCanvas = {
 const STANDARD_TILE = "https://tile.openstreetmap.org";
 const TOPO_TILE = "https://a.tile.opentopomap.org";
 const HEIGHT_BANDS = [1, 2, 3, 5];
+const ANALYTIC_COLORS = {
+  road: "#ece7db",
+  park: "#dfe8d6",
+  water: "#d5e5ee",
+  building1: "#d9d0c4",
+  building2: "#cabaa4",
+  building3: "#b5956d",
+  building4: "#8f6844",
+  terrain1: "rgba(204, 184, 156, 0.34)",
+  terrain2: "rgba(176, 146, 111, 0.24)",
+  terrain3: "rgba(140, 108, 72, 0.22)"
+};
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -198,6 +212,88 @@ async function loadTileCanvas(baseUrl: string, zone: ParsedGoogleZone, zoom: num
 
   await Promise.all(tasks);
   return { canvas, zoom };
+}
+
+function serializeCanvas(canvas: HTMLCanvasElement, type = "image/jpeg", quality = 0.82, maxEdge = 1024): string {
+  const largestEdge = Math.max(canvas.width, canvas.height);
+  if (largestEdge <= maxEdge) {
+    return canvas.toDataURL(type, quality);
+  }
+
+  const scale = maxEdge / largestEdge;
+  const resized = document.createElement("canvas");
+  resized.width = Math.max(1, Math.round(canvas.width * scale));
+  resized.height = Math.max(1, Math.round(canvas.height * scale));
+  const context = resized.getContext("2d")!;
+  context.drawImage(canvas, 0, 0, resized.width, resized.height);
+  return resized.toDataURL(type, quality);
+}
+
+function analyticHeightColor(heightBand: number | undefined): string {
+  if (!heightBand || heightBand <= 1) {
+    return ANALYTIC_COLORS.building1;
+  }
+  if (heightBand === 2) {
+    return ANALYTIC_COLORS.building2;
+  }
+  if (heightBand === 3) {
+    return ANALYTIC_COLORS.building3;
+  }
+  return ANALYTIC_COLORS.building4;
+}
+
+function buildAnalyticOverlayDataUrl(
+  footprint: { width: number; depth: number },
+  terrainCells: TerrainCell[],
+  referenceCells: SiteStudyCell[]
+): string {
+  const cellSize = 24;
+  const canvas = document.createElement("canvas");
+  canvas.width = footprint.width * cellSize;
+  canvas.height = footprint.depth * cellSize;
+  const context = canvas.getContext("2d")!;
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  terrainCells.forEach((cell) => {
+    context.fillStyle =
+      cell.tier >= 3
+        ? ANALYTIC_COLORS.terrain3
+        : cell.tier === 2
+          ? ANALYTIC_COLORS.terrain2
+          : ANALYTIC_COLORS.terrain1;
+    context.fillRect(cell.x * cellSize, cell.y * cellSize, cellSize, cellSize);
+  });
+
+  referenceCells.forEach((cell) => {
+    context.fillStyle =
+      cell.kind === "road"
+        ? ANALYTIC_COLORS.road
+        : cell.kind === "park"
+          ? ANALYTIC_COLORS.park
+          : cell.kind === "water"
+            ? ANALYTIC_COLORS.water
+            : analyticHeightColor(cell.heightBand);
+    context.fillRect(cell.x * cellSize, cell.y * cellSize, cellSize, cellSize);
+  });
+
+  context.strokeStyle = "#ddd8cf";
+  context.lineWidth = 1;
+  for (let x = 0; x <= footprint.width; x += 1) {
+    context.beginPath();
+    context.moveTo(x * cellSize, 0);
+    context.lineTo(x * cellSize, canvas.height);
+    context.stroke();
+  }
+  for (let y = 0; y <= footprint.depth; y += 1) {
+    context.beginPath();
+    context.moveTo(0, y * cellSize);
+    context.lineTo(canvas.width, y * cellSize);
+    context.stroke();
+  }
+
+  return canvas.toDataURL("image/png");
 }
 
 function classifyPixel(r: number, g: number, b: number): CellKind | null {
@@ -1038,18 +1134,22 @@ export async function buildRasterSiteVariantFromGoogleZone(options: {
     `${roadCells} circulation cells, ${parkCells} green cells, and ${waterCells} water cells preserved as void structure.`
   ];
 
+  const terrainCells = Array.from(terrainMap.entries())
+    .filter(([key]) => !buildingMap.has(key as CellKey))
+    .map(([key, tier]) => {
+      const [x, y] = key.split(":").map(Number);
+      return { x, y, tier };
+    });
+
   const study: SiteStudy = {
     zone,
     footprint,
     cellMeters,
     tileZoom,
+    sourceRasterDataUrl: serializeCanvas(mapRaster.canvas),
+    analyticRasterDataUrl: buildAnalyticOverlayDataUrl(footprint, terrainCells, referenceCells),
     referenceCells,
-    terrainCells: Array.from(terrainMap.entries())
-      .filter(([key]) => !buildingMap.has(key as CellKey))
-      .map(([key, tier]) => {
-        const [x, y] = key.split(":").map(Number);
-        return { x, y, tier };
-      }),
+    terrainCells,
     blockBaseLevels,
     metrics: {
       buildingCells: sourceBuildingCount,

@@ -41,6 +41,8 @@ export default function App() {
     terrainMode: "stepped",
     urbanPreset: "compact-core",
     abstractionRatio: 55,
+    referenceOverlayMode: "source-map",
+    referenceOverlayOpacity: 38,
     blockStrategy: "generative",
     uniformWidthCm: 2,
     uniformDepthCm: 2,
@@ -252,6 +254,8 @@ export default function App() {
                   selectedSemanticNodeId={selectedSemanticNodeId}
                   onSelectSemanticNode={setSelectedSemanticNodeId}
                   study={selectedStudy}
+                  referenceOverlayMode={siteImportState.referenceOverlayMode}
+                  referenceOverlayOpacity={siteImportState.referenceOverlayOpacity}
                 />
               )}
             </section>
@@ -297,6 +301,8 @@ export default function App() {
                     selectedSemanticNodeId={selectedSemanticNodeId}
                     onSelectSemanticNode={setSelectedSemanticNodeId}
                     study={selectedStudy}
+                    referenceOverlayMode={siteImportState.referenceOverlayMode}
+                    referenceOverlayOpacity={siteImportState.referenceOverlayOpacity}
                   />
                 )}
               </aside>
@@ -355,6 +361,18 @@ export default function App() {
             setSiteImportState((current) => ({
               ...current,
               abstractionRatio: value
+            }))
+          }
+          onSiteImportReferenceOverlayModeChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              referenceOverlayMode: value
+            }))
+          }
+          onSiteImportReferenceOverlayOpacityChange={(value) =>
+            setSiteImportState((current) => ({
+              ...current,
+              referenceOverlayOpacity: value
             }))
           }
           onSiteImportBlockStrategyChange={(value) =>

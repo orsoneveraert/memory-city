@@ -6,6 +6,7 @@ export type ZoneTypeProfile = "balanced" | "compact" | "vertical";
 export type ZoneDataMode = "open-raster" | "seeded";
 export type ZoneTerrainMode = "flat" | "stepped";
 export type ZoneUrbanPreset = "compact-core" | "waterfront" | "hillside" | "campus" | "suburban";
+export type ZoneReferenceOverlayMode = "off" | "source-map" | "analytic-field";
 
 export type ZoneImportState = {
   sourceUrl: string;
@@ -15,6 +16,8 @@ export type ZoneImportState = {
   terrainMode: ZoneTerrainMode;
   urbanPreset: ZoneUrbanPreset;
   abstractionRatio: number;
+  referenceOverlayMode: ZoneReferenceOverlayMode;
+  referenceOverlayOpacity: number;
   blockStrategy: ZoneBlockStrategy;
   uniformWidthCm: number;
   uniformDepthCm: number;
@@ -90,6 +93,12 @@ export const ZONE_DATA_MODE_LABELS: Record<ZoneDataMode, string> = {
 export const ZONE_TERRAIN_MODE_LABELS: Record<ZoneTerrainMode, string> = {
   flat: "Flat base",
   stepped: "Stepped terrain"
+};
+
+export const ZONE_REFERENCE_OVERLAY_LABELS: Record<ZoneReferenceOverlayMode, string> = {
+  off: "Off",
+  "source-map": "Source map",
+  "analytic-field": "Analytic field"
 };
 
 export const ZONE_URBAN_PRESET_LABELS: Record<ZoneUrbanPreset, string> = {

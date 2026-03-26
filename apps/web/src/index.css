@@ -504,6 +504,17 @@ button {
   gap: 8px;
 }
 
+.block-diagram-shell {
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.block-diagram-shell svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .field-grid {
   display: grid;
   gap: 8px;
